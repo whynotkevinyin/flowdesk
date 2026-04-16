@@ -2118,7 +2118,7 @@
             try {
                 const pushData = {
                     action: 'syncAll',
-                    key: localStorage.getItem('flowdesk_pin') || '',
+                    key: FLOWDESK_API_KEY || localStorage.getItem('flowdesk_api_key') || '',
                     groups: appData.groups,
                     members: appData.members,
                     events: calendarData.events.map(ev => ({

@@ -2104,13 +2104,25 @@
                     renderApp();
                 }
                 // Sync events — normalize field names from cloud
+                function parseTimeField(t) {
+                    if (!t) return '';
+                    t = String(t);
+                    // Handle ISO format like "1899-12-30T03:00:00.000Z" from Google Sheets
+                    if (t.includes('T')) {
+                        const match = t.match(/T(\d{2}):(\d{2})/);
+                        if (match) return match[1] + ':' + match[2];
+                    }
+                    // Already "HH:MM" format
+                    if (/^\d{2}:\d{2}$/.test(t)) return t;
+                    return t;
+                }
                 if (data.events) {
                     calendarData.events = data.events.map(ev => ({
                         id: ev.id || Date.now(),
                         title: ev.title || '',
                         event_date: ev.event_date || ev.date || '',
-                        start_time: ev.start_time || ev.startTime || '09:00',
-                        end_time: ev.end_time || ev.endTime || '10:00',
+                        start_time: parseTimeField(ev.start_time || ev.startTime) || '09:00',
+                        end_time: parseTimeField(ev.end_time || ev.endTime) || '10:00',
                         color: ev.color || '#0073ea',
                         all_day: ev.all_day || ev.allDay || false,
                         description: ev.description || ''

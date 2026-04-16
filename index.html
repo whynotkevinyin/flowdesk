@@ -3611,35 +3611,159 @@
         }
 
         function addEvent(dateStr) {
-            const title = prompt('Event title:');
-            if (!title) return;
-            const event = {
-                id: Date.now(),
-                title,
-                event_date: dateStr,
+            openEventModal(null, dateStr);
+        }
+
+        function editEvent(eventId) {
+            const ev = calendarData.events.find(e => e.id === eventId);
+            if (!ev) return;
+            openEventModal(ev);
+        }
+
+        function openEventModal(existingEvent, dateStr) {
+            const isEdit = !!existingEvent;
+            const ev = existingEvent || {
+                title: '',
+                event_date: dateStr || formatDateStr(calendarDate),
                 start_time: '09:00',
                 end_time: '10:00',
                 color: '#0073ea',
                 all_day: false,
                 description: ''
             };
-            calendarData.events.push(event);
-            saveCalendarData();
-            renderCalendar();
-        }
+            const colors = [
+                {c:'#0073ea',n:'Blue'},{c:'#00c875',n:'Green'},{c:'#e2445c',n:'Red'},
+                {c:'#fdab3d',n:'Orange'},{c:'#a25ddc',n:'Purple'},{c:'#579bfc',n:'Sky'},
+                {c:'#7f5347',n:'Brown'},{c:'#c4c4c4',n:'Grey'}
+            ];
+            const colorOpts = colors.map(({c,n}) =>
+                `<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;margin-right:8px;">
+                    <input type="radio" name="evColor" value="${c}" ${ev.color===c?'checked':''} style="display:none;">
+                    <span style="width:22px;height:22px;border-radius:50%;background:${c};display:inline-block;border:${ev.color===c?'2.5px solid #fff':'2.5px solid transparent'};box-shadow:${ev.color===c?'0 0 0 2px '+c:'none'};cursor:pointer;" onclick="this.parentElement.querySelector('input').checked=true;document.querySelectorAll('#eventModal .ev-color-dot').forEach(d=>{d.style.border='2.5px solid transparent';d.style.boxShadow='none';});this.style.border='2.5px solid #fff';this.style.boxShadow='0 0 0 2px ${c}';" class="ev-color-dot"></span>
+                </label>`
+            ).join('');
 
-        function editEvent(eventId) {
-            const ev = calendarData.events.find(e => e.id === eventId);
-            if (!ev) return;
-            const title = prompt('Event title:', ev.title);
-            if (title === null) return;
-            if (title === '') {
-                calendarData.events = calendarData.events.filter(e => e.id !== eventId);
-            } else {
-                ev.title = title;
+            const overlay = document.createElement('div');
+            overlay.id = 'eventModalOverlay';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.45);z-index:10000;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.15s ease;';
+            const thm = THEMES[currentTheme] || THEMES['Light'];
+            const isDark = thm.bg.toLowerCase() < '#888';
+            const modalBg = thm.cardBg || thm.bg;
+            const modalText = thm.text;
+            const modalBorder = thm.border;
+            const inputBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
+
+            overlay.innerHTML = `
+            <div id="eventModal" style="background:${modalBg};color:${modalText};border-radius:14px;padding:28px 32px;min-width:380px;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);font-family:Inter,sans-serif;">
+                <h3 style="margin:0 0 20px;font-size:18px;font-weight:600;">${isEdit ? 'Edit Event' : 'New Event'}</h3>
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div>
+                        <label style="font-size:12px;font-weight:500;color:${modalText};opacity:0.7;margin-bottom:4px;display:block;">Title</label>
+                        <input id="evTitle" type="text" value="${(ev.title||'').replace(/"/g,'&quot;')}" placeholder="Event title..."
+                            style="width:100%;padding:9px 12px;border:1px solid ${modalBorder};border-radius:8px;font-size:14px;background:${inputBg};color:${modalText};box-sizing:border-box;outline:none;">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;font-weight:500;color:${modalText};opacity:0.7;margin-bottom:4px;display:block;">Date</label>
+                        <input id="evDate" type="date" value="${ev.event_date||''}"
+                            style="width:100%;padding:9px 12px;border:1px solid ${modalBorder};border-radius:8px;font-size:14px;background:${inputBg};color:${modalText};box-sizing:border-box;outline:none;">
+                    </div>
+                    <div>
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                            <input id="evAllDay" type="checkbox" ${ev.all_day?'checked':''} style="width:16px;height:16px;cursor:pointer;">
+                            All day
+                        </label>
+                    </div>
+                    <div id="evTimeRow" style="display:${ev.all_day?'none':'flex'};gap:12px;">
+                        <div style="flex:1;">
+                            <label style="font-size:12px;font-weight:500;color:${modalText};opacity:0.7;margin-bottom:4px;display:block;">Start</label>
+                            <input id="evStart" type="time" value="${ev.start_time||'09:00'}"
+                                style="width:100%;padding:9px 12px;border:1px solid ${modalBorder};border-radius:8px;font-size:14px;background:${inputBg};color:${modalText};box-sizing:border-box;outline:none;">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="font-size:12px;font-weight:500;color:${modalText};opacity:0.7;margin-bottom:4px;display:block;">End</label>
+                            <input id="evEnd" type="time" value="${ev.end_time||'10:00'}"
+                                style="width:100%;padding:9px 12px;border:1px solid ${modalBorder};border-radius:8px;font-size:14px;background:${inputBg};color:${modalText};box-sizing:border-box;outline:none;">
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size:12px;font-weight:500;color:${modalText};opacity:0.7;margin-bottom:4px;display:block;">Description</label>
+                        <textarea id="evDesc" rows="2" placeholder="Optional..."
+                            style="width:100%;padding:9px 12px;border:1px solid ${modalBorder};border-radius:8px;font-size:14px;background:${inputBg};color:${modalText};box-sizing:border-box;outline:none;resize:vertical;font-family:inherit;">${ev.description||''}</textarea>
+                    </div>
+                    <div>
+                        <label style="font-size:12px;font-weight:500;color:${modalText};opacity:0.7;margin-bottom:6px;display:block;">Color</label>
+                        <div>${colorOpts}</div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:22px;justify-content:flex-end;${isEdit?'':''}">
+                    ${isEdit ? `<button id="evDeleteBtn" style="margin-right:auto;padding:9px 18px;border-radius:8px;border:1px solid #e2445c;background:transparent;color:#e2445c;font-size:14px;cursor:pointer;font-weight:500;">Delete</button>` : ''}
+                    <button id="evCancelBtn" style="padding:9px 18px;border-radius:8px;border:1px solid ${modalBorder};background:transparent;color:${modalText};font-size:14px;cursor:pointer;">Cancel</button>
+                    <button id="evSaveBtn" style="padding:9px 24px;border-radius:8px;border:none;background:#0073ea;color:white;font-size:14px;cursor:pointer;font-weight:500;">Save</button>
+                </div>
+            </div>`;
+            document.body.appendChild(overlay);
+
+            const titleInput = document.getElementById('evTitle');
+            titleInput.focus();
+            titleInput.select();
+
+            // Toggle time row on all-day change
+            document.getElementById('evAllDay').addEventListener('change', (e) => {
+                document.getElementById('evTimeRow').style.display = e.target.checked ? 'none' : 'flex';
+            });
+
+            // Close on overlay click
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+            // Close on Escape
+            const escHandler = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); }};
+            document.addEventListener('keydown', escHandler);
+
+            // Save
+            document.getElementById('evSaveBtn').addEventListener('click', () => {
+                const title = document.getElementById('evTitle').value.trim();
+                if (!title) { document.getElementById('evTitle').style.borderColor='#e2445c'; return; }
+                const selectedColor = document.querySelector('#eventModal input[name="evColor"]:checked');
+                const data = {
+                    title,
+                    event_date: document.getElementById('evDate').value,
+                    start_time: document.getElementById('evStart').value || '09:00',
+                    end_time: document.getElementById('evEnd').value || '10:00',
+                    color: selectedColor ? selectedColor.value : '#0073ea',
+                    all_day: document.getElementById('evAllDay').checked,
+                    description: document.getElementById('evDesc').value.trim()
+                };
+                if (isEdit) {
+                    Object.assign(existingEvent, data);
+                } else {
+                    data.id = Date.now();
+                    calendarData.events.push(data);
+                }
+                saveCalendarData();
+                renderCalendar();
+                overlay.remove();
+                document.removeEventListener('keydown', escHandler);
+            });
+
+            // Enter to save
+            titleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('evSaveBtn').click(); });
+
+            // Cancel
+            document.getElementById('evCancelBtn').addEventListener('click', () => {
+                overlay.remove();
+                document.removeEventListener('keydown', escHandler);
+            });
+
+            // Delete (edit mode only)
+            if (isEdit) {
+                document.getElementById('evDeleteBtn').addEventListener('click', () => {
+                    calendarData.events = calendarData.events.filter(e => e.id !== existingEvent.id);
+                    saveCalendarData();
+                    renderCalendar();
+                    overlay.remove();
+                    document.removeEventListener('keydown', escHandler);
+                });
             }
-            saveCalendarData();
-            renderCalendar();
         }
 
         function saveCalendarData() {

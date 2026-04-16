@@ -36,13 +36,11 @@ from PyQt6.QtCore import (
     Qt, QSize, QDate, QTime, QTimer, pyqtSignal, QMimeData, QPoint,
     QPropertyAnimation, QEasingCurve
 )
-from PyQt6.QtWidgets import QShortcut
-from PyQt6.QtGui import QKeySequence
 from PyQt6.QtGui import (
     QColor, QPalette, QFont, QIcon, QAction, QPainter,
     QBrush, QPen, QDrag, QPixmap, QTextCharFormat, QTextListFormat,
     QTextBlockFormat, QTextCursor, QSyntaxHighlighter,
-    QTextDocument, QTextFrameFormat
+    QTextDocument, QTextFrameFormat, QKeySequence, QShortcut
 )
 
 
@@ -1835,6 +1833,93 @@ class SlashCommandMenu(QListWidget):
             super().keyPressEvent(event)
 
 
+class ImageDropTextEdit(QTextEdit):
+    """QTextEdit subclass that handles image drag-drop and clipboard paste.
+
+    Images (from files or clipboard) are converted to base64 data URIs
+    and inserted inline so they are stored inside the note content.
+    """
+
+    MAX_IMAGE_WIDTH = 600  # pixels – resize if wider to keep notes manageable
+
+    def canInsertFromMimeData(self, source):
+        if source.hasImage() or source.hasUrls():
+            return True
+        return super().canInsertFromMimeData(source)
+
+    def insertFromMimeData(self, source):
+        # 1) Clipboard image (e.g. screenshot Cmd+V)
+        if source.hasImage():
+            img = source.imageData()
+            if img and not img.isNull():
+                self._embed_qimage(img)
+                return
+
+        # 2) Dropped / pasted file URLs
+        if source.hasUrls():
+            handled = False
+            for url in source.urls():
+                path = url.toLocalFile()
+                if path and any(path.lower().endswith(ext) for ext in
+                                ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg')):
+                    self._embed_image_file(path)
+                    handled = True
+            if handled:
+                return
+
+        # Fallback – let Qt handle text/HTML
+        super().insertFromMimeData(source)
+
+    def _embed_qimage(self, qimage):
+        """Convert a QImage to base64 PNG and insert into the document."""
+        from PyQt6.QtCore import QBuffer, QIODevice
+        qimage = self._constrain_width(qimage)
+        buf = QBuffer()
+        buf.open(QIODevice.OpenModeFlag.WriteOnly)
+        qimage.save(buf, "PNG")
+        b64 = bytes(buf.data().toBase64()).decode('ascii')
+        self._insert_html_image(f"data:image/png;base64,{b64}")
+
+    def _embed_image_file(self, filepath):
+        """Read an image file, convert to base64 data URI, and insert."""
+        import base64, mimetypes
+        mime, _ = mimetypes.guess_type(filepath)
+        if not mime:
+            mime = "image/png"
+        try:
+            with open(filepath, 'rb') as f:
+                raw = f.read()
+            # Optionally constrain width
+            img = QPixmap()
+            img.loadFromData(raw)
+            if not img.isNull() and img.width() > self.MAX_IMAGE_WIDTH:
+                img = img.scaledToWidth(self.MAX_IMAGE_WIDTH, Qt.TransformationMode.SmoothTransformation)
+                from PyQt6.QtCore import QBuffer, QIODevice
+                buf = QBuffer()
+                buf.open(QIODevice.OpenModeFlag.WriteOnly)
+                img.save(buf, "PNG")
+                raw = bytes(buf.data())
+                mime = "image/png"
+            b64 = base64.b64encode(raw).decode('ascii')
+            self._insert_html_image(f"data:{mime};base64,{b64}")
+        except Exception as e:
+            cursor = self.textCursor()
+            cursor.insertText(f"[Image error: {e}]")
+
+    def _constrain_width(self, qimage):
+        """Resize QImage if wider than MAX_IMAGE_WIDTH."""
+        if qimage.width() > self.MAX_IMAGE_WIDTH:
+            return qimage.scaledToWidth(self.MAX_IMAGE_WIDTH, Qt.TransformationMode.SmoothTransformation)
+        return qimage
+
+    def _insert_html_image(self, data_uri):
+        """Insert an <img> tag with the given data URI at the cursor position."""
+        cursor = self.textCursor()
+        cursor.insertHtml(
+            f'<br><img src="{data_uri}" style="max-width:100%;"><br>'
+        )
+
+
 class RichTextEditor(QWidget):
     """Notion-style rich text editor with toolbar, slash commands, and formatting.
 
@@ -2106,7 +2191,7 @@ class RichTextEditor(QWidget):
         layout.addWidget(self._title_separator)
 
         # ── Editor ──
-        self.editor = QTextEdit()
+        self.editor = ImageDropTextEdit()
         self.editor.setAcceptRichText(True)
         self.editor.viewport().setCursor(Qt.CursorShape.IBeamCursor)
         t = self.theme

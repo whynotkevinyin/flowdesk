@@ -33,13 +33,16 @@ from PyQt6.QtWidgets import (
     QTimeEdit, QColorDialog
 )
 from PyQt6.QtCore import (
-    Qt, QSize, QDate, QTime, QTimer, pyqtSignal, QMimeData, QPoint
+    Qt, QSize, QDate, QTime, QTimer, pyqtSignal, QMimeData, QPoint,
+    QPropertyAnimation, QEasingCurve
 )
+from PyQt6.QtWidgets import QShortcut
+from PyQt6.QtGui import QKeySequence
 from PyQt6.QtGui import (
     QColor, QPalette, QFont, QIcon, QAction, QPainter,
     QBrush, QPen, QDrag, QPixmap, QTextCharFormat, QTextListFormat,
     QTextBlockFormat, QTextCursor, QSyntaxHighlighter,
-    QTextDocument
+    QTextDocument, QTextFrameFormat
 )
 
 
@@ -75,6 +78,22 @@ EVENT_COLORS = [
     "#0073ea", "#e8830c", "#00c875", "#e2445c",
     "#a25ddc", "#579bfc", "#fdab3d", "#7f5347",
 ]
+
+TAG_COLORS = [
+    ('#E8F0FE', '#1967D2'), ('#FCE8E6', '#C5221F'), ('#E6F4EA', '#137333'),
+    ('#FEF7E0', '#B06000'), ('#F3E8FD', '#7627BB'), ('#E0F7FA', '#00838F'),
+]
+
+FONT_FAMILIES = {
+    'Sans-serif': '"Helvetica Neue", -apple-system, sans-serif',
+    'Serif': 'Georgia, "Times New Roman", serif',
+    'Monospace': '"SF Mono", Menlo, Consolas, monospace',
+}
+
+def get_tag_color(tag):
+    """Return (bg_color, text_color) for a tag based on its name hash."""
+    h = hash(tag) % len(TAG_COLORS)
+    return TAG_COLORS[h]
 
 LIGHT_THEME = {
     "bg":          "#fefcf3",
@@ -382,6 +401,10 @@ class Database:
             self.conn.execute("ALTER TABLE notes ADD COLUMN folder TEXT NOT NULL DEFAULT ''")
         if "sort_order" not in cols:
             self.conn.execute("ALTER TABLE notes ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
+        if "tags" not in cols:
+            self.conn.execute("ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+        if "font" not in cols:
+            self.conn.execute("ALTER TABLE notes ADD COLUMN font TEXT NOT NULL DEFAULT 'Sans-serif'")
         self.conn.commit()
 
     # ── Groups ──
@@ -549,10 +572,10 @@ class Database:
             (start_date, end_date)
         ).fetchall()
 
-    def add_event(self, title, event_date, start_time="09:00", end_time="10:00", color="#0073ea", all_day=0, description=""):
+    def add_event(self, title, event_date, start_time="09:00", end_time="10:00", color="#0073ea", all_day=0, description="", gcal_id=""):
         cur = self.conn.execute(
-            "INSERT INTO events(title, event_date, start_time, end_time, color, all_day, description) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (title, event_date, start_time, end_time, color, all_day, description)
+            "INSERT INTO events(title, event_date, start_time, end_time, color, all_day, description, gcal_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (title, event_date, start_time, end_time, color, all_day, description, gcal_id)
         )
         self.conn.commit()
         return cur.lastrowid
@@ -586,11 +609,11 @@ class Database:
             self.conn.execute("UPDATE notes SET sort_order=? WHERE id=?", (i, nid))
         self.conn.commit()
 
-    def add_note(self, title="Untitled", content="", color="#0073ea", folder=""):
+    def add_note(self, title="Untitled", content="", color="#0073ea", folder="", tags="", font="Sans-serif"):
         max_order = self.conn.execute("SELECT COALESCE(MAX(sort_order),0) FROM notes").fetchone()[0]
         cur = self.conn.execute(
-            "INSERT INTO notes(title, content, color, folder, sort_order) VALUES (?, ?, ?, ?, ?)",
-            (title, content, color, folder, max_order + 1)
+            "INSERT INTO notes(title, content, color, folder, sort_order, tags, font) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (title, content, color, folder, max_order + 1, tags, font)
         )
         self.conn.commit()
         return cur.lastrowid
@@ -605,6 +628,27 @@ class Database:
     def delete_note(self, nid):
         self.conn.execute("DELETE FROM notes WHERE id=?", (nid,))
         self.conn.commit()
+
+    def get_all_tags(self):
+        """Return all unique tags across all notes."""
+        rows = self.conn.execute("SELECT tags FROM notes WHERE tags != ''").fetchall()
+        tag_set = set()
+        for r in rows:
+            for tag in r["tags"].split(","):
+                tag = tag.strip()
+                if tag:
+                    tag_set.add(tag)
+        return sorted(tag_set)
+
+    def get_notes_by_tag(self, tag):
+        """Return notes that contain the given tag."""
+        all_notes = self.get_notes()
+        result = []
+        for n in all_notes:
+            tags = [t.strip() for t in n["tags"].split(",") if t.strip()] if n["tags"] else []
+            if tag in tags:
+                result.append(n)
+        return result
 
     # ── Note-Task Links ──
     def get_note_tasks(self, note_id):
@@ -804,7 +848,7 @@ class SyncManager:
         try:
             db = self._thread_db()
             key_param = f"&key={urllib.parse.quote(self.api_key)}" if self.api_key else ""
-            url = f"{self.sync_url}?action=getTasks{key_param}"
+            url = f"{self.sync_url}?action=getTasksLight{key_param}"
             remote = self._http_get(url)
             if remote.get("code") == 401:
                 raise Exception("Unauthorized — check your API Key")
@@ -871,29 +915,51 @@ class SyncManager:
             remote_events = remote.get("events", [])
             if remote_events is not None:
                 local_events = db.get_events()
+                local_ev_ids = {str(ev["id"]): dict(ev) for ev in local_events}
                 local_ev_titles = {ev["title"]: dict(ev) for ev in local_events}
-                remote_ev_titles = set()
+                # Also index by gcal_id so we don't duplicate Google Calendar events
+                local_gcal_ids = {}
+                for ev in local_events:
+                    gid = ev["gcal_id"] if "gcal_id" in ev.keys() else ""
+                    if gid:
+                        local_gcal_ids[gid] = dict(ev)
+
                 for rev in remote_events:
                     t = rev.get("title", "")
-                    remote_ev_titles.add(t)
-                    if t in local_ev_titles:
-                        lev = local_ev_titles[t]
-                        db.update_event(lev["id"],
+                    rid = rev.get("id", "")
+                    gcal_id = rev.get("gcalId", "")
+                    # Parse time - handle ISO format from Google Sheets
+                    st = rev.get("startTime", "")
+                    et = rev.get("endTime", "")
+                    if "T" in st:
+                        try: st = st.split("T")[1][:5]
+                        except: pass
+                    if "T" in et:
+                        try: et = et.split("T")[1][:5]
+                        except: pass
+
+                    # Check if already exists locally (by id, gcal_id, or title)
+                    existing = local_ev_ids.get(rid) or local_gcal_ids.get(gcal_id) or local_ev_titles.get(t)
+                    if existing:
+                        db.update_event(existing["id"],
                             event_date=rev.get("date", ""),
-                            start_time=rev.get("startTime", ""),
-                            end_time=rev.get("endTime", ""),
+                            start_time=st or existing.get("start_time", ""),
+                            end_time=et or existing.get("end_time", ""),
                             color=rev.get("color", "#0073ea"),
-                            all_day=1 if rev.get("allDay") else 0)
+                            all_day=1 if rev.get("allDay") else 0,
+                            gcal_id=gcal_id)
                     else:
                         db.add_event(t, rev.get("date", ""),
-                            start_time=rev.get("startTime", "09:00"),
-                            end_time=rev.get("endTime", "10:00"),
+                            start_time=st or "09:00",
+                            end_time=et or "10:00",
                             color=rev.get("color", "#0073ea"),
-                            all_day=1 if rev.get("allDay") else 0)
+                            all_day=1 if rev.get("allDay") else 0,
+                            gcal_id=gcal_id)
                 # NOTE: Never delete local events during pull.
                 # Local is authoritative — pull only adds/updates.
 
             # ── Sync Notes from remote (add only, never delete local) ──
+            # Light mode: notes have metadata only, fetch content on demand for new notes
             remote_notes = remote.get("notes", [])
             if remote_notes:
                 local_notes = db.get_notes()
@@ -902,9 +968,19 @@ class SyncManager:
                     t = rn.get("title", "")
                     if not t or t in local_note_titles:
                         continue  # skip existing — local is authoritative
-                    # Only add notes that don't exist locally
+                    # New note — fetch content from cloud
+                    content = rn.get("content", "")
+                    if not content and rn.get("id"):
+                        try:
+                            note_url = f"{self.sync_url}?action=getNoteContent&noteId={rn['id']}{key_param}"
+                            note_data = self._http_get(note_url)
+                            content = note_data.get("content", "")
+                        except:
+                            content = ""
                     folder = rn.get("folder", "")
-                    nid = db.add_note(t, rn.get("content", ""), folder=folder)
+                    tags = rn.get("tags", "")
+                    font = rn.get("font", "Sans-serif")
+                    nid = db.add_note(t, content, folder=folder, tags=tags, font=font)
                     db.update_note(nid,
                         pinned=1 if rn.get("pinned") else 0,
                         sort_order=rn.get("sortOrder", rn.get("sort_order", 0)))
@@ -957,19 +1033,28 @@ class SyncManager:
                     "date": ev["event_date"], "startTime": ev["start_time"],
                     "endTime": ev["end_time"], "color": ev["color"],
                     "allDay": bool(ev["all_day"]),
+                    "gcalId": ev["gcal_id"] if "gcal_id" in ev.keys() else "",
                 })
 
-            # Notes — full content sent; stored in Google Drive files (no size limit)
+            # Notes — only send content for notes modified since last sync
             push_data["notes"] = []
+            last_sync = getattr(self, '_last_sync_time', '')
             for n in db.get_notes():
                 nd = dict(n)
-                push_data["notes"].append({
+                note_updated = nd.get("updated_at", "")
+                modified = (not last_sync) or (note_updated > last_sync)
+                entry = {
                     "id": str(nd["id"]), "title": nd["title"],
-                    "content": nd.get("content", ""),
                     "pinned": bool(nd["pinned"]),
                     "folder": nd.get("folder", ""),
                     "sortOrder": nd.get("sort_order", 0),
-                })
+                    "tags": nd.get("tags", ""),
+                    "font": nd.get("font", "Sans-serif"),
+                }
+                if modified:
+                    entry["content"] = nd.get("content", "")
+                # else: no content key → server skips Drive write
+                push_data["notes"].append(entry)
 
             result = self._http_post(self.sync_url, push_data)
             if result.get("code") == 401:
@@ -977,7 +1062,9 @@ class SyncManager:
             if result.get("error"):
                 raise Exception(f"Sync error: {result['error']}")
 
-            # Push succeeded — clear deletion records (remote now matches local)
+            # Push succeeded — record sync time and clear deletion records
+            from datetime import datetime
+            self._last_sync_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
             db.clear_sync_deletions()
             db.conn.close()
             self.status = self.STATUS_OK
@@ -1671,155 +1758,490 @@ class CalendarView(QWidget):
 
 
 # ─── Rich Text Note Editor ───────────────────────────────────
+class SlashCommandMenu(QListWidget):
+    """Popup menu for slash commands, shown when user types '/' at line start."""
+    command_selected = pyqtSignal(str)
+
+    COMMANDS = [
+        ("Text", "Plain text paragraph", "text"),
+        ("Heading 1", "Large heading", "h1"),
+        ("Heading 2", "Medium heading", "h2"),
+        ("Heading 3", "Small heading", "h3"),
+        ("Bullet List", "Unordered list", "bullet"),
+        ("Numbered List", "Ordered list", "numbered"),
+        ("To-do List", "Checklist with checkboxes", "checklist"),
+        ("Quote", "Blockquote", "quote"),
+        ("Divider", "Horizontal rule", "divider"),
+        ("Code Block", "Monospace code", "code"),
+        ("Callout", "Highlighted callout box", "callout"),
+    ]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+        self.setFixedWidth(240)
+        self.setMaximumHeight(300)
+        self.setStyleSheet("""
+            QListWidget {
+                background: #ffffff; border: 1px solid #E3E2E0;
+                border-radius: 8px; padding: 4px; font-size: 13px;
+                outline: none;
+            }
+            QListWidget::item {
+                padding: 6px 10px; border-radius: 4px; color: #37352F;
+            }
+            QListWidget::item:hover { background: #F7F6F3; }
+            QListWidget::item:selected { background: #E8F0FE; color: #37352F; }
+        """)
+        self._all_commands = list(self.COMMANDS)
+        self._populate("")
+        self.itemClicked.connect(self._on_click)
+
+    def _populate(self, filter_text):
+        self.clear()
+        ft = filter_text.lower()
+        for label, desc, cmd_id in self._all_commands:
+            if ft and ft not in label.lower() and ft not in desc.lower():
+                continue
+            item = QListWidgetItem(f"{label}\n{desc}")
+            item.setData(Qt.ItemDataRole.UserRole, cmd_id)
+            self.addItem(item)
+        if self.count() > 0:
+            self.setCurrentRow(0)
+        visible_items = min(self.count(), 8)
+        self.setFixedHeight(max(visible_items * 42 + 10, 52))
+
+    def filter(self, text):
+        self._populate(text)
+        return self.count() > 0
+
+    def _on_click(self, item):
+        cmd = item.data(Qt.ItemDataRole.UserRole)
+        if cmd:
+            self.command_selected.emit(cmd)
+            self.hide()
+
+    def select_current(self):
+        item = self.currentItem()
+        if item:
+            self._on_click(item)
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self.select_current()
+        elif event.key() == Qt.Key.Key_Escape:
+            self.hide()
+        else:
+            super().keyPressEvent(event)
+
+
 class RichTextEditor(QWidget):
+    """Notion-style rich text editor with toolbar, slash commands, and formatting.
+
+    Provides bold/italic/underline/strikethrough, headings, lists, quotes,
+    code blocks, callouts, dividers, highlight, and text color.
+    Emits ``content_changed`` whenever the document is modified.
+    """
     content_changed = pyqtSignal()
+
+    TEXT_COLORS = {
+        "Default": "",
+        "Red": "#EB5757",
+        "Blue": "#2F80ED",
+        "Green": "#27AE60",
+        "Orange": "#F2994A",
+        "Purple": "#9B51E0",
+    }
 
     def __init__(self, theme, parent=None):
         super().__init__(parent)
         self.theme = theme
+        self._slash_active = False
+        self._slash_filter = ""
         self._build()
 
     def set_theme(self, theme):
+        """Apply the given theme dict to the editor and toolbar."""
         self.theme = theme
         t = theme
         self.editor.setStyleSheet(f"""
             QTextEdit {{
                 background-color: {t['card_bg']};
                 color: {t['text']};
-                border: 1px solid {t['border']};
-                border-radius: 6px;
-                padding: 12px;
-                font-size: 13px;
-                line-height: 1.6;
+                border: none;
+                border-radius: 8px;
+                padding: 20px 28px;
+                font-size: 14px;
+                line-height: 1.7;
+                selection-background-color: rgba(45,125,230,0.25);
             }}
         """)
+        self.editor.viewport().setCursor(Qt.CursorShape.IBeamCursor)
+        self._update_toolbar_theme()
+
+    def _update_toolbar_theme(self):
+        t = self.theme
+        is_dark = t.get('bg', '#fff')[1:3] < '80' if len(t.get('bg', '#fff')) > 3 else False
+        hover_bg = "rgba(255,255,255,0.1)" if is_dark else "rgba(0,0,0,0.06)"
+        checked_bg = "rgba(0,115,234,0.18)"
+        text_color = t.get('text', '#37352F')
+        sep_color = t.get('border', '#E3E2E0')
+        self._btn_style = f"""
+            QPushButton {{
+                border: none; border-radius: 4px;
+                padding: 3px 7px; font-size: 12px;
+                background: transparent; color: {text_color};
+            }}
+            QPushButton:hover {{ background-color: {hover_bg}; }}
+            QPushButton:checked {{ background-color: {checked_bg}; color: #0073ea; }}
+        """
+        for btn in self._toolbar_buttons:
+            btn.setStyleSheet(self._btn_style)
+        # Restore the color button's special red "A" style
+        if hasattr(self, 'color_btn'):
+            hover_bg_css = hover_bg
+            self.color_btn.setStyleSheet(f"""
+                QPushButton {{
+                    border: none; border-radius: 4px; padding: 3px 7px;
+                    font-size: 12px; background: transparent; color: #EB5757;
+                }}
+                QPushButton:hover {{ background-color: {hover_bg_css}; }}
+                QPushButton::menu-indicator {{ image: none; width: 0px; }}
+            """)
+        for sep in self._toolbar_seps:
+            sep.setStyleSheet(f"background: {sep_color}; border: none;")
+        toolbar_bg = '#252525' if is_dark else t.get('card_bg', '#fff')
+        border = '#373737' if is_dark else t.get('border', '#E3E2E0')
+        self.toolbar_frame.setStyleSheet(f"""
+            QFrame#notionToolbar {{
+                background: {toolbar_bg};
+                border: 1px solid {border};
+                border-radius: 8px;
+                padding: 2px 4px;
+            }}
+        """)
+        # Update the separator between toolbar and editor
+        if hasattr(self, '_title_separator'):
+            self._title_separator.setStyleSheet(f"background: {sep_color}; border: none;")
+
+    def _make_sep(self):
+        sep = QFrame()
+        sep.setFixedWidth(1)
+        sep.setFixedHeight(20)
+        sep.setStyleSheet("background: #E3E2E0; border: none;")
+        self._toolbar_seps.append(sep)
+        return sep
+
+    def _make_btn(self, text, tooltip, checkable=False, width=28, bold=False, italic=False, underline=False, strikethrough=False):
+        """Create a consistent 28x28 toolbar button with tooltip and optional formatting."""
+        btn = QPushButton(text)
+        btn.setToolTip(tooltip)
+        btn.setFixedSize(width, 28)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        f = QFont("Inter", 11)
+        if bold:
+            f.setBold(True)
+        if italic:
+            f.setItalic(True)
+        if underline:
+            f.setUnderline(True)
+        if strikethrough:
+            f.setStrikeOut(True)
+        btn.setFont(f)
+        btn.setCheckable(checkable)
+        btn.setStyleSheet(self._btn_style)
+        self._toolbar_buttons.append(btn)
+        return btn
 
     def _build(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(6)
 
-        # Toolbar
-        tb = QHBoxLayout()
-        tb.setSpacing(2)
-
-        btn_style = """
+        self._toolbar_buttons = []
+        self._toolbar_seps = []
+        self._btn_style = """
             QPushButton {
                 border: none; border-radius: 4px;
-                padding: 4px 8px; font-size: 12px;
-                background: transparent;
+                padding: 3px 7px; font-size: 12px;
+                background: transparent; color: #37352F;
             }
-            QPushButton:hover { background-color: rgba(0,0,0,0.08); }
-            QPushButton:checked { background-color: rgba(0,115,234,0.15); color: #0073ea; }
+            QPushButton:hover { background-color: rgba(0,0,0,0.06); }
+            QPushButton:checked { background-color: rgba(0,115,234,0.18); color: #0073ea; }
         """
 
-        self.bold_btn = QPushButton("B")
-        self.bold_btn.setFont(QFont("Inter", 12, QFont.Weight.Bold))
-        self.bold_btn.setCheckable(True)
-        self.bold_btn.setFixedSize(30, 28)
-        self.bold_btn.setStyleSheet(btn_style)
+        # Toolbar frame (Notion-style)
+        self.toolbar_frame = QFrame()
+        self.toolbar_frame.setObjectName("notionToolbar")
+        self.toolbar_frame.setStyleSheet("""
+            QFrame#notionToolbar {
+                background: #ffffff;
+                border: 1px solid #E3E2E0;
+                border-radius: 8px;
+                padding: 2px 4px;
+            }
+        """)
+        tb = QHBoxLayout(self.toolbar_frame)
+        tb.setContentsMargins(6, 3, 6, 3)
+        tb.setSpacing(2)
+
+        # ── Text formatting: Bold | Italic | Underline | Strikethrough ──
+        self.bold_btn = self._make_btn("B", "Bold (Ctrl+B)", checkable=True, bold=True)
         self.bold_btn.clicked.connect(self._toggle_bold)
         tb.addWidget(self.bold_btn)
 
-        self.italic_btn = QPushButton("I")
-        f = QFont("Inter", 12)
-        f.setItalic(True)
-        self.italic_btn.setFont(f)
-        self.italic_btn.setCheckable(True)
-        self.italic_btn.setFixedSize(30, 28)
-        self.italic_btn.setStyleSheet(btn_style)
+        self.italic_btn = self._make_btn("I", "Italic (Ctrl+I)", checkable=True, italic=True)
         self.italic_btn.clicked.connect(self._toggle_italic)
         tb.addWidget(self.italic_btn)
 
-        self.underline_btn = QPushButton("U")
-        fu = QFont("Inter", 12)
-        fu.setUnderline(True)
-        self.underline_btn.setFont(fu)
-        self.underline_btn.setCheckable(True)
-        self.underline_btn.setFixedSize(30, 28)
-        self.underline_btn.setStyleSheet(btn_style)
+        self.underline_btn = self._make_btn("U", "Underline (Ctrl+U)", checkable=True, underline=True)
         self.underline_btn.clicked.connect(self._toggle_underline)
         tb.addWidget(self.underline_btn)
 
-        sep1 = QFrame()
-        sep1.setFrameShape(QFrame.Shape.VLine)
-        sep1.setFixedWidth(1)
-        sep1.setStyleSheet("color: #ccc;")
-        tb.addWidget(sep1)
+        self.strike_btn = self._make_btn("S", "Strikethrough (Ctrl+Shift+X)", checkable=True, strikethrough=True)
+        self.strike_btn.clicked.connect(self._toggle_strikethrough)
+        tb.addWidget(self.strike_btn)
 
-        # Heading combo
-        self.heading_combo = QComboBox()
-        self.heading_combo.addItems(["Normal", "Heading 1", "Heading 2", "Heading 3"])
-        self.heading_combo.setFixedHeight(28)
-        self.heading_combo.setFixedWidth(110)
-        self.heading_combo.currentIndexChanged.connect(self._set_heading)
-        tb.addWidget(self.heading_combo)
+        tb.addWidget(self._make_sep())
 
-        sep2 = QFrame()
-        sep2.setFrameShape(QFrame.Shape.VLine)
-        sep2.setFixedWidth(1)
-        sep2.setStyleSheet("color: #ccc;")
-        tb.addWidget(sep2)
+        # ── Headings: H1 | H2 | H3 ──
+        self.h1_btn = self._make_btn("H1", "Heading 1 (Ctrl+1)", width=30)
+        self.h1_btn.clicked.connect(lambda: self._set_heading(1))
+        tb.addWidget(self.h1_btn)
 
-        self.bullet_btn = QPushButton("\u2022 List")
-        self.bullet_btn.setFixedHeight(28)
-        self.bullet_btn.setStyleSheet(btn_style)
+        self.h2_btn = self._make_btn("H2", "Heading 2 (Ctrl+2)", width=30)
+        self.h2_btn.clicked.connect(lambda: self._set_heading(2))
+        tb.addWidget(self.h2_btn)
+
+        self.h3_btn = self._make_btn("H3", "Heading 3 (Ctrl+3)", width=30)
+        self.h3_btn.clicked.connect(lambda: self._set_heading(3))
+        tb.addWidget(self.h3_btn)
+
+        tb.addWidget(self._make_sep())
+
+        # ── Block types: Bullet | Numbered | Checklist | Quote | Code | Callout ──
+        self.bullet_btn = self._make_btn("\u2022", "Bullet List (Ctrl+Shift+8)")
         self.bullet_btn.clicked.connect(self._toggle_bullet)
         tb.addWidget(self.bullet_btn)
 
-        self.num_btn = QPushButton("1. List")
-        self.num_btn.setFixedHeight(28)
-        self.num_btn.setStyleSheet(btn_style)
+        self.num_btn = self._make_btn("1.", "Numbered List (Ctrl+Shift+7)")
         self.num_btn.clicked.connect(self._toggle_numbered)
         tb.addWidget(self.num_btn)
 
-        sep3 = QFrame()
-        sep3.setFrameShape(QFrame.Shape.VLine)
-        sep3.setFixedWidth(1)
-        sep3.setStyleSheet("color: #ccc;")
-        tb.addWidget(sep3)
+        self.check_btn = self._make_btn("\u2611", "Checklist (Ctrl+Shift+9)")
+        self.check_btn.clicked.connect(self._insert_checklist)
+        tb.addWidget(self.check_btn)
 
-        self.code_btn = QPushButton("{ }")
-        self.code_btn.setFixedHeight(28)
-        self.code_btn.setStyleSheet(btn_style)
+        self.quote_btn = self._make_btn("\u275D", "Quote Block")
+        self.quote_btn.clicked.connect(self._insert_quote)
+        tb.addWidget(self.quote_btn)
+
+        self.code_btn = self._make_btn("</>", "Code Block", width=32)
         self.code_btn.clicked.connect(self._insert_code_block)
         tb.addWidget(self.code_btn)
 
-        self.highlight_btn = QPushButton("\u270e Highlight")
-        self.highlight_btn.setFixedHeight(28)
-        self.highlight_btn.setStyleSheet(btn_style)
+        self.table_btn = self._make_btn("\u229e", "Insert Table")
+        self.table_btn.clicked.connect(self._insert_table)
+        tb.addWidget(self.table_btn)
+
+        self.callout_btn = self._make_btn("\u2139", "Callout")
+        self.callout_btn.clicked.connect(self._insert_callout)
+        tb.addWidget(self.callout_btn)
+
+        tb.addWidget(self._make_sep())
+
+        # ── Insert: Divider | Highlight | Text Color ──
+        self.divider_btn = self._make_btn("\u2014", "Insert Divider")
+        self.divider_btn.clicked.connect(self._insert_divider)
+        tb.addWidget(self.divider_btn)
+
+        self.highlight_btn = self._make_btn("\u2588", "Highlight (Ctrl+Shift+H)")
         self.highlight_btn.clicked.connect(self._toggle_highlight)
         tb.addWidget(self.highlight_btn)
 
-        tb.addStretch()
-        layout.addLayout(tb)
+        # ── Text color dropdown ──
+        self.color_btn = QPushButton("A")
+        self.color_btn.setToolTip("Text Color")
+        self.color_btn.setFixedSize(28, 28)
+        self.color_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.color_btn.setFont(QFont("Inter", 11, QFont.Weight.Bold))
+        self.color_btn.setStyleSheet("""
+            QPushButton {
+                border: none; border-radius: 4px; padding: 3px 7px;
+                font-size: 12px; background: transparent; color: #EB5757;
+            }
+            QPushButton:hover { background-color: rgba(0,0,0,0.06); }
+            QPushButton::menu-indicator { image: none; width: 0px; }
+        """)
+        color_menu = QMenu(self)
+        color_menu.setStyleSheet("""
+            QMenu { background: #fff; border: 1px solid #E3E2E0; border-radius: 6px; padding: 4px; }
+            QMenu::item { padding: 5px 16px; border-radius: 4px; font-size: 12px; color: #37352F; }
+            QMenu::item:selected { background: #F7F6F3; }
+        """)
+        for name, color in self.TEXT_COLORS.items():
+            action = color_menu.addAction(f"\u25CF {name}" if color else f"  {name}")
+            if color:
+                action.setData(color)
+            else:
+                action.setData("")
+        color_menu.triggered.connect(self._apply_text_color)
+        self.color_btn.setMenu(color_menu)
+        self._toolbar_buttons.append(self.color_btn)
+        tb.addWidget(self.color_btn)
 
-        # Editor
+        tb.addStretch()
+
+        # Slash command hint
+        slash_hint = QLabel("  Type / for commands")
+        slash_hint.setStyleSheet("color: #B4B4B0; font-size: 11px; font-style: italic; border: none; background: transparent;")
+        tb.addWidget(slash_hint)
+
+        layout.addWidget(self.toolbar_frame)
+
+        # ── Separator between toolbar and content ──
+        self._title_separator = QFrame()
+        self._title_separator.setFixedHeight(1)
+        self._title_separator.setStyleSheet(f"background: {self.theme.get('border', '#E3E2E0')}; border: none;")
+        layout.addWidget(self._title_separator)
+
+        # ── Editor ──
         self.editor = QTextEdit()
         self.editor.setAcceptRichText(True)
+        self.editor.viewport().setCursor(Qt.CursorShape.IBeamCursor)
         t = self.theme
         self.editor.setStyleSheet(f"""
             QTextEdit {{
                 background-color: {t['card_bg']};
                 color: {t['text']};
-                border: 1px solid {t['border']};
-                border-radius: 6px;
-                padding: 12px;
-                font-size: 13px;
+                border: none;
+                border-radius: 8px;
+                padding: 20px 28px;
+                font-size: 14px;
+                selection-background-color: rgba(45,125,230,0.25);
             }}
         """)
         self.editor.textChanged.connect(self.content_changed.emit)
         self.editor.cursorPositionChanged.connect(self._update_toolbar_state)
+        self.editor.installEventFilter(self)
         layout.addWidget(self.editor)
 
+        # Slash command popup
+        self._slash_menu = SlashCommandMenu(self)
+        self._slash_menu.command_selected.connect(self._execute_slash_command)
+        self._slash_menu.hide()
+
+    # ── Slash command support ──────────────────────────────────
+    def eventFilter(self, obj, event):
+        """Intercept key events in the editor to manage slash command popup."""
+        if obj == self.editor and event.type() == event.Type.KeyPress:
+            key = event.key()
+            if self._slash_active:
+                if key == Qt.Key.Key_Escape:
+                    self._slash_active = False
+                    self._slash_menu.hide()
+                    return True
+                elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                    self._slash_menu.select_current()
+                    self._slash_active = False
+                    return True
+                elif key == Qt.Key.Key_Up:
+                    row = self._slash_menu.currentRow()
+                    if row > 0:
+                        self._slash_menu.setCurrentRow(row - 1)
+                    return True
+                elif key == Qt.Key.Key_Down:
+                    row = self._slash_menu.currentRow()
+                    if row < self._slash_menu.count() - 1:
+                        self._slash_menu.setCurrentRow(row + 1)
+                    return True
+                elif key == Qt.Key.Key_Backspace:
+                    if self._slash_filter:
+                        self._slash_filter = self._slash_filter[:-1]
+                        if not self._slash_menu.filter(self._slash_filter):
+                            self._slash_active = False
+                            self._slash_menu.hide()
+                    else:
+                        self._slash_active = False
+                        self._slash_menu.hide()
+                    return False  # let backspace propagate
+                elif event.text() and event.text().isprintable():
+                    self._slash_filter += event.text()
+                    if not self._slash_menu.filter(self._slash_filter):
+                        self._slash_active = False
+                        self._slash_menu.hide()
+                    return False  # let char propagate
+                else:
+                    self._slash_active = False
+                    self._slash_menu.hide()
+            else:
+                if event.text() == "/":
+                    cursor = self.editor.textCursor()
+                    block_text = cursor.block().text()
+                    pos_in_block = cursor.positionInBlock()
+                    if pos_in_block == 0 or block_text[:pos_in_block].strip() == "":
+                        self._slash_active = True
+                        self._slash_filter = ""
+                        self._slash_menu.filter("")
+                        # Position the popup near the cursor
+                        rect = self.editor.cursorRect()
+                        global_pos = self.editor.mapToGlobal(rect.bottomLeft())
+                        self._slash_menu.move(global_pos.x(), global_pos.y() + 4)
+                        self._slash_menu.show()
+        return super().eventFilter(obj, event)
+
+    def _execute_slash_command(self, cmd):
+        """Execute the chosen slash command by removing the '/' prefix and applying the block type."""
+        cursor = self.editor.textCursor()
+        block_start = cursor.block().position()
+        block_text = cursor.block().text()
+        # Find and remove the slash + filter text
+        slash_pos = block_text.rfind("/")
+        if slash_pos >= 0:
+            cursor.setPosition(block_start + slash_pos)
+            cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+            cursor.removeSelectedText()
+            self.editor.setTextCursor(cursor)
+
+        if cmd == "text":
+            pass  # just clear the slash
+        elif cmd == "h1":
+            self._set_heading(1)
+        elif cmd == "h2":
+            self._set_heading(2)
+        elif cmd == "h3":
+            self._set_heading(3)
+        elif cmd == "bullet":
+            self._toggle_bullet()
+        elif cmd == "numbered":
+            self._toggle_numbered()
+        elif cmd == "checklist":
+            self._insert_checklist()
+        elif cmd == "quote":
+            self._insert_quote()
+        elif cmd == "divider":
+            self._insert_divider()
+        elif cmd == "code":
+            self._insert_code_block()
+        elif cmd == "callout":
+            self._insert_callout()
+
+        self._slash_active = False
+        self._slash_menu.hide()
+
+    # ── Toolbar state sync ──────────────────────────────────────
     def _update_toolbar_state(self):
+        """Sync toolbar button checked states with the current cursor format."""
         cursor = self.editor.textCursor()
         fmt = cursor.charFormat()
         self.bold_btn.setChecked(fmt.fontWeight() == QFont.Weight.Bold)
         self.italic_btn.setChecked(fmt.fontItalic())
         self.underline_btn.setChecked(fmt.fontUnderline())
+        self.strike_btn.setChecked(fmt.fontStrikeOut())
 
+    # ── Text formatting actions ──────────────────────────────────
     def _toggle_bold(self):
+        """Toggle bold on the current selection or word."""
         fmt = QTextCharFormat()
         fmt.setFontWeight(QFont.Weight.Bold if self.bold_btn.isChecked() else QFont.Weight.Normal)
         self._merge_format(fmt)
@@ -1834,21 +2256,28 @@ class RichTextEditor(QWidget):
         fmt.setFontUnderline(self.underline_btn.isChecked())
         self._merge_format(fmt)
 
+    def _toggle_strikethrough(self):
+        fmt = QTextCharFormat()
+        fmt.setFontStrikeOut(self.strike_btn.isChecked())
+        self._merge_format(fmt)
+
+    # ── Block formatting actions ─────────────────────────────────
     def _set_heading(self, idx):
+        """Apply heading level (1-3) or reset to normal (0) on the current block."""
         cursor = self.editor.textCursor()
         block_fmt = QTextBlockFormat()
         char_fmt = QTextCharFormat()
         if idx == 0:  # Normal
-            char_fmt.setFontPointSize(13)
+            char_fmt.setFontPointSize(14)
             char_fmt.setFontWeight(QFont.Weight.Normal)
         elif idx == 1:  # H1
-            char_fmt.setFontPointSize(22)
+            char_fmt.setFontPointSize(24)
             char_fmt.setFontWeight(QFont.Weight.Bold)
         elif idx == 2:  # H2
-            char_fmt.setFontPointSize(18)
+            char_fmt.setFontPointSize(20)
             char_fmt.setFontWeight(QFont.Weight.Bold)
         elif idx == 3:  # H3
-            char_fmt.setFontPointSize(15)
+            char_fmt.setFontPointSize(16)
             char_fmt.setFontWeight(QFont.Weight.Bold)
         cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
         cursor.mergeBlockFormat(block_fmt)
@@ -1884,16 +2313,105 @@ class RichTextEditor(QWidget):
             list_fmt.setStyle(QTextListFormat.Style.ListDecimal)
             cursor.createList(list_fmt)
 
-    def _insert_code_block(self):
+    def _insert_checklist(self):
         cursor = self.editor.textCursor()
-        fmt = QTextCharFormat()
-        fmt.setFontFamily("Courier New")
-        fmt.setBackground(QColor("#f0f0f0"))
-        fmt.setFontPointSize(12)
-        if cursor.hasSelection():
-            cursor.mergeCharFormat(fmt)
-        else:
-            cursor.insertText("code here", fmt)
+        cursor.insertText("\u2610 ")
+        self.editor.setTextCursor(cursor)
+
+    def _insert_quote(self):
+        cursor = self.editor.textCursor()
+        block_fmt = QTextBlockFormat()
+        block_fmt.setLeftMargin(20)
+        char_fmt = QTextCharFormat()
+        char_fmt.setForeground(QColor("#787774"))
+        char_fmt.setFontItalic(True)
+        char_fmt.setFontPointSize(14)
+        # Insert a block with left border feel via margin + styling
+        cursor.insertBlock(block_fmt, char_fmt)
+        cursor.insertText("\u2503 ")
+        self.editor.setTextCursor(cursor)
+
+    def _insert_divider(self):
+        cursor = self.editor.textCursor()
+        cursor.insertBlock()
+        cursor.insertHtml('<hr style="border: none; border-top: 1px solid #E3E2E0; margin: 12px 0;">')
+        cursor.insertBlock()
+        self.editor.setTextCursor(cursor)
+
+    def _insert_code_block(self):
+        """Insert a styled code block with language label."""
+        from PyQt6.QtWidgets import QInputDialog
+        lang, ok = QInputDialog.getItem(self, "Code Block", "Language:",
+            ["python", "javascript", "html", "css", "sql", "bash", "json", "text"], 0, True)
+        if not ok:
+            return
+        cursor = self.editor.textCursor()
+        # Insert a formatted block
+        block_fmt = QTextBlockFormat()
+        block_fmt.setBackground(QColor("#1E1E1E"))
+        block_fmt.setTopMargin(12)
+        block_fmt.setBottomMargin(12)
+        block_fmt.setLeftMargin(16)
+        block_fmt.setRightMargin(16)
+
+        char_fmt = QTextCharFormat()
+        char_fmt.setFontFamily("SF Mono, Menlo, Consolas, monospace")
+        char_fmt.setForeground(QColor("#E3E2E0"))
+        char_fmt.setFontPointSize(12)
+
+        # Language label in dimmer color
+        label_fmt = QTextCharFormat(char_fmt)
+        label_fmt.setForeground(QColor("#6A9955"))
+        label_fmt.setFontPointSize(10)
+
+        cursor.insertBlock(block_fmt, char_fmt)
+        cursor.insertText(f"// {lang}\n", label_fmt)
+        cursor.insertText("code here", char_fmt)
+        self.editor.setTextCursor(cursor)
+
+    def _insert_table(self):
+        """Insert an editable table into the note."""
+        from PyQt6.QtWidgets import QInputDialog
+        rows, ok1 = QInputDialog.getInt(self, "Table", "Rows:", 3, 1, 20)
+        if not ok1:
+            return
+        cols, ok2 = QInputDialog.getInt(self, "Table", "Columns:", 3, 1, 10)
+        if not ok2:
+            return
+
+        cursor = self.editor.textCursor()
+        table = cursor.insertTable(rows, cols)
+
+        # Style the table
+        fmt = table.format()
+        fmt.setBorder(1)
+        fmt.setBorderBrush(QColor("#E3E2E0"))
+        fmt.setCellPadding(8)
+        fmt.setCellSpacing(0)
+        fmt.setBorderStyle(QTextFrameFormat.BorderStyle.BorderStyle_Solid)
+        table.setFormat(fmt)
+
+        # Style header row
+        for col in range(cols):
+            cell = table.cellAt(0, col)
+            cf = cell.format()
+            cf.setBackground(QColor("#F7F6F3"))
+            cell.setFormat(cf)
+            cur = cell.firstCursorPosition()
+            cur.insertText(f"Header {col + 1}")
+
+    def _insert_callout(self):
+        cursor = self.editor.textCursor()
+        block_fmt = QTextBlockFormat()
+        block_fmt.setLeftMargin(16)
+        block_fmt.setRightMargin(16)
+        block_fmt.setTopMargin(8)
+        block_fmt.setBottomMargin(8)
+        char_fmt = QTextCharFormat()
+        char_fmt.setBackground(QColor("#FFF8E1"))
+        char_fmt.setFontPointSize(13)
+        cursor.insertBlock(block_fmt, char_fmt)
+        cursor.insertText("\U0001F4A1 ")
         self.editor.setTextCursor(cursor)
 
     def _toggle_highlight(self):
@@ -1906,7 +2424,17 @@ class RichTextEditor(QWidget):
             fmt.setBackground(QColor("#fff3bf"))
         self._merge_format(fmt)
 
+    def _apply_text_color(self, action):
+        color = action.data()
+        fmt = QTextCharFormat()
+        if color:
+            fmt.setForeground(QColor(color))
+        else:
+            fmt.setForeground(QColor(self.theme.get('text', '#37352F')))
+        self._merge_format(fmt)
+
     def _merge_format(self, fmt):
+        """Apply a character format to the current selection, or the word under cursor."""
         cursor = self.editor.textCursor()
         if not cursor.hasSelection():
             cursor.select(QTextCursor.SelectionType.WordUnderCursor)
@@ -2348,50 +2876,358 @@ class _DonutChartWidget(QWidget):
 
 
 # ─── Notes Page ──────────────────────────────────────────────
+class NoteItemWidget(QWidget):
+    """Custom widget for note list items with 2-line preview, Notion-style.
+
+    Displays title (with optional pin/folder icons), content preview, and date.
+    Handles special characters safely via Qt text rendering.
+    Supports search highlight and tag chips.
+    """
+    def __init__(self, title, preview, date_str, pinned=False, folder="", show_folder=False, is_active=False, theme=None, highlight="", tags=None, parent=None):
+        super().__init__(parent)
+        t = theme or LIGHT_THEME
+        self.setFixedHeight(68)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 8, 10, 8)
+        layout.setSpacing(2)
+
+        # Title line
+        title_layout = QHBoxLayout()
+        title_layout.setSpacing(4)
+        if pinned:
+            pin_lbl = QLabel("\u2605")
+            pin_lbl.setStyleSheet("color: #F2994A; font-size: 11px; border: none; background: transparent;")
+            pin_lbl.setFixedWidth(14)
+            title_layout.addWidget(pin_lbl)
+        if show_folder and folder:
+            folder_lbl = QLabel("\U0001F4C1")
+            folder_lbl.setStyleSheet("font-size: 10px; border: none; background: transparent;")
+            folder_lbl.setFixedWidth(14)
+            title_layout.addWidget(folder_lbl)
+        title_lbl = QLabel()
+        if highlight:
+            title_lbl.setTextFormat(Qt.TextFormat.RichText)
+            title_lbl.setText(self._highlight_text(title, highlight, t))
+        else:
+            title_lbl.setText(title)
+        title_lbl.setFont(QFont("Inter", 12, QFont.Weight.DemiBold))
+        title_lbl.setStyleSheet(f"color: {t.get('text', '#37352F')}; border: none; background: transparent;")
+        title_lbl.setMaximumWidth(220)
+        title_layout.addWidget(title_lbl)
+        # Tag chips in title row (compact, max 2)
+        if tags:
+            shown_tags = tags[:2]
+            for tag in shown_tags:
+                bg, fg = get_tag_color(tag)
+                tag_lbl = QLabel(tag)
+                tag_lbl.setStyleSheet(f"background: {bg}; color: {fg}; border-radius: 6px; padding: 1px 5px; font-size: 8px; font-weight: 600; border: none;")
+                tag_lbl.setFixedHeight(14)
+                title_layout.addWidget(tag_lbl)
+            if len(tags) > 2:
+                more_lbl = QLabel(f"+{len(tags)-2}")
+                more_lbl.setStyleSheet(f"color: {t.get('text_dim', '#999')}; font-size: 8px; border: none; background: transparent;")
+                title_layout.addWidget(more_lbl)
+        title_layout.addStretch()
+        layout.addLayout(title_layout)
+
+        # Preview + date line
+        bottom_layout = QHBoxLayout()
+        bottom_layout.setSpacing(6)
+        preview_text = preview[:60] if preview else "No content"
+        preview_lbl = QLabel()
+        if highlight:
+            preview_lbl.setTextFormat(Qt.TextFormat.RichText)
+            preview_lbl.setText(self._highlight_text(preview_text, highlight, t))
+        else:
+            preview_lbl.setText(preview_text)
+        preview_lbl.setStyleSheet(f"color: {t.get('text_dim', '#999')}; font-size: 11px; border: none; background: transparent;")
+        preview_lbl.setMaximumWidth(180)
+        bottom_layout.addWidget(preview_lbl)
+        bottom_layout.addStretch()
+        date_lbl = QLabel(date_str)
+        date_lbl.setStyleSheet(f"color: {t.get('text_dim', '#999')}; font-size: 9px; border: none; background: transparent;")
+        bottom_layout.addWidget(date_lbl)
+        layout.addLayout(bottom_layout)
+
+    @staticmethod
+    def _highlight_text(text, query, theme):
+        """Return HTML with matching substring highlighted."""
+        import html as html_mod
+        safe = html_mod.escape(text)
+        safe_q = html_mod.escape(query)
+        if not safe_q:
+            return safe
+        import re
+        pattern = re.compile(re.escape(safe_q), re.IGNORECASE)
+        return pattern.sub(lambda m: f'<span style="background:#FDEB9C; color:#3d3a33; border-radius:2px; padding:0 1px;">{m.group()}</span>', safe)
+
+
 class NotesPage(QWidget):
+    """Full-featured Notion-style notes page with sidebar, folders, rich editor, and search.
+
+    Supports CRUD, folder management, pinning, drag-reorder, linked tasks,
+    auto-save with debounce, and keyboard shortcuts.
+    """
+
     def __init__(self, db, theme, parent=None):
         super().__init__(parent)
         self.db = db
         self.theme = theme
         self.current_note_id = None
         self.current_folder = None  # None = show all, "" = unfiled, "X" = folder X
+        self._last_saved_content = ""  # Track content for efficient saves
+        self._last_saved_title = ""
         self._build()
+        self._setup_shortcuts()
 
     def set_theme(self, theme):
         self.theme = theme
         self.editor.set_theme(theme)
+        self._apply_notes_theme()
         self._refresh_folders()
+        self._refresh_tag_filter()
         self._refresh_list()
 
+    def _apply_notes_theme(self):
+        """Apply comprehensive theme to every notes page element, including dark mode."""
+        t = self.theme
+        is_dark = t.get('bg', '#fff')[1:3] < '80' if len(t.get('bg', '#fff')) > 3 else False
+
+        # ── Dark-mode overrides for Notion-like feel ──
+        sidebar_bg = '#1E1E1E' if is_dark else t.get('section_bg', '#F7F6F3')
+        editor_bg = '#191919' if is_dark else t.get('card_bg', '#fff')
+        text_color = '#E3E2E0' if is_dark else t.get('text', '#37352F')
+        border_color = '#373737' if is_dark else t.get('border', '#E3E2E0')
+        active_item_bg = '#2D2D2D' if is_dark else 'rgba(0,115,234,0.08)'
+        toolbar_bg = '#252525' if is_dark else t.get('card_bg', '#fff')
+        hover_bg = "rgba(255,255,255,0.06)" if is_dark else "rgba(0,0,0,0.04)"
+        active_border = t.get('accent', '#0073ea')
+
+        # ── Left panel (sidebar) ──
+        self._left_panel.setStyleSheet(f"""
+            QWidget#notesLeftPanel {{
+                background: {sidebar_bg};
+                border-right: 1px solid {border_color};
+            }}
+        """)
+
+        # ── Note list ──
+        self.note_list.setStyleSheet(f"""
+            QListWidget {{
+                background: {sidebar_bg};
+                border: none;
+                outline: none;
+                font-size: 13px;
+            }}
+            QListWidget::item {{
+                border-radius: 8px;
+                margin: 1px 4px;
+                padding: 0px;
+                border-left: 3px solid transparent;
+            }}
+            QListWidget::item:hover {{
+                background: {hover_bg};
+            }}
+            QListWidget::item:selected {{
+                background: {active_item_bg};
+                border-left: 3px solid {active_border};
+            }}
+        """)
+
+        # ── Search input with focus glow ──
+        focus_glow = f"0 0 0 2px rgba(0,115,234,0.3)" if not is_dark else f"0 0 0 2px rgba(0,115,234,0.4)"
+        self.search.setStyleSheet(f"""
+            QLineEdit {{
+                background: {t.get('toolbar_input_bg', 'rgba(0,0,0,0.05)')};
+                border: 1px solid {border_color};
+                border-radius: 8px;
+                padding: 4px 12px;
+                font-size: 12px;
+                color: {text_color};
+            }}
+            QLineEdit:focus {{
+                border: 1px solid {active_border};
+            }}
+        """)
+
+        # ── Right panel (editor area) ──
+        self._right_panel.setStyleSheet(f"""
+            QWidget#notesRightPanel {{
+                background: {editor_bg};
+            }}
+        """)
+
+        # ── Title input with subtle bottom line on focus ──
+        self.note_title.setStyleSheet(f"""
+            QLineEdit {{
+                border: none;
+                border-bottom: 2px solid transparent;
+                background: transparent;
+                padding: 4px 0px;
+                font-size: 28px;
+                font-weight: bold;
+                color: {text_color};
+            }}
+            QLineEdit:focus {{
+                border-bottom: 2px solid {border_color};
+            }}
+            QLineEdit:disabled {{
+                color: {t.get('text_dim', '#999')};
+                border-bottom: none;
+            }}
+        """)
+
+        # ── Breadcrumb ──
+        self.breadcrumb_label.setStyleSheet(f"color: {t.get('text_dim', '#999')}; font-size: 11px; border: none; background: transparent;")
+
+        # ── Cover banner ──
+        cover_color = t.get('accent', '#0073ea')
+        self.cover_banner.setStyleSheet(f"""
+            QFrame#coverBanner {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {cover_color}, stop:1 {'#00b894' if not is_dark else '#2d6a4f'});
+                border-radius: 8px;
+                min-height: 6px; max-height: 6px;
+            }}
+        """)
+
+        # ── Header title and section label ──
+        self.header_title.setStyleSheet(f"color: {text_color}; border: none; background: transparent;")
+        self.recent_label.setStyleSheet(f"color: {t.get('text_dim', '#999')}; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; border: none; background: transparent; padding-left: 4px;")
+
+        # ── Folder combo ──
+        self.folder_combo.setStyleSheet(f"""
+            QComboBox {{
+                font-size: 11px; padding: 2px 8px; border-radius: 6px;
+                border: 1px solid {border_color}; background: transparent;
+                color: {text_color};
+            }}
+            QComboBox:hover {{ border: 1px solid {active_border}; }}
+            QComboBox QAbstractItemView {{
+                background: {editor_bg}; color: {text_color};
+                border: 1px solid {border_color}; border-radius: 6px;
+                selection-background-color: {active_item_bg};
+            }}
+        """)
+
+        # ── Word count & metadata ──
+        self.word_count_label.setStyleSheet(f"color: {t.get('text_dim', '#999')}; font-size: 10px; border: none; background: transparent;")
+        self.meta_label.setStyleSheet(f"color: {t.get('text_dim', '#999')}; font-size: 10px; border: none; background: transparent;")
+
+        # ── Tag input & search count ──
+        self._tag_input.setStyleSheet(f"""
+            QLineEdit {{
+                font-size: 11px; padding: 2px 6px; border-radius: 6px;
+                border: 1px dashed {border_color}; background: transparent;
+                color: {text_color};
+            }}
+            QLineEdit:focus {{ border: 1px solid {active_border}; }}
+        """)
+        self.search_count_label.setStyleSheet(f"color: {t.get('text_dim', '#999')}; font-size: 10px; border: none; background: transparent; padding-left: 4px;")
+        self._tag_filter_label.setStyleSheet(f"color: {t.get('text_dim', '#999')}; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; border: none; background: transparent; padding-left: 4px;")
+
+        # ── Font combo ──
+        self.font_combo.setStyleSheet(f"""
+            QComboBox {{
+                font-size: 11px; padding: 2px 8px; border-radius: 6px;
+                border: 1px solid {border_color}; background: transparent;
+                color: {text_color};
+            }}
+            QComboBox:hover {{ border: 1px solid {active_border}; }}
+            QComboBox QAbstractItemView {{
+                background: {editor_bg}; color: {text_color};
+                border: 1px solid {border_color}; border-radius: 6px;
+                selection-background-color: {active_item_bg};
+            }}
+        """)
+
+        # ── Export button ──
+        if hasattr(self, 'export_btn'):
+            export_menu_bg = '#252525' if is_dark else '#fff'
+            export_menu_sel = '#2D2D2D' if is_dark else '#F7F6F3'
+            self.export_btn.setStyleSheet(f"""
+                QPushButton {{
+                    border: 1px solid {border_color}; border-radius: 6px;
+                    padding: 2px 10px; font-size: 11px; background: transparent;
+                    color: {text_color};
+                }}
+                QPushButton:hover {{ border: 1px solid {active_border}; color: {active_border}; }}
+                QPushButton::menu-indicator {{ image: none; width: 0px; }}
+            """)
+            self.export_btn.menu().setStyleSheet(f"""
+                QMenu {{ background: {export_menu_bg}; border: 1px solid {border_color}; border-radius: 6px; padding: 4px; }}
+                QMenu::item {{ padding: 5px 16px; border-radius: 4px; font-size: 12px; color: {text_color}; }}
+                QMenu::item:selected {{ background: {export_menu_sel}; }}
+            """)
+
+        # ── Save indicator ──
+        if hasattr(self, '_save_indicator'):
+            self._save_indicator.setStyleSheet(f"color: {t.get('text_dim', '#999')}; font-size: 10px; border: none; background: transparent;")
+
+        # ── Empty state ──
+        if hasattr(self, '_empty_state'):
+            self._empty_state.setStyleSheet(f"color: {t.get('text_dim', '#999')}; background: transparent; border: none;")
+            for child in self._empty_state.findChildren(QLabel):
+                child.setStyleSheet(f"color: {t.get('text_dim', '#999')}; border: none; background: transparent;")
+            for child in self._empty_state.findChildren(QPushButton):
+                child.setStyleSheet(f"QPushButton {{ background-color: {active_border}; color: white; border: none; border-radius: 20px; font-size: 20px; font-weight: bold; }} QPushButton:hover {{ background-color: #0060c7; }}")
+
+        # ── Splitter hover color ──
+        if hasattr(self, '_splitter'):
+            self._splitter.setStyleSheet(f"""
+                QSplitter::handle {{ background: transparent; }}
+                QSplitter::handle:hover {{ background: {active_border}; }}
+            """)
+
     def _build(self):
-        # Debounce timer for auto-save
+        """Build the complete notes UI: sidebar, editor, toolbars, empty state."""
+        # ── Timers ──
         self._save_timer = QTimer()
         self._save_timer.setSingleShot(True)
         self._save_timer.setInterval(500)
         self._save_timer.timeout.connect(self._do_save)
 
+        self._search_debounce = QTimer()
+        self._search_debounce.setSingleShot(True)
+        self._search_debounce.setInterval(150)
+        self._search_debounce.timeout.connect(self._do_search)
+
+        # Save indicator fade timer
+        self._save_indicator_timer = QTimer()
+        self._save_indicator_timer.setSingleShot(True)
+        self._save_indicator_timer.setInterval(1500)
+        self._save_indicator_timer.timeout.connect(lambda: self._save_indicator.setText(""))
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Splitter for resizable left/right panels
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setHandleWidth(3)
-        splitter.setStyleSheet("QSplitter::handle { background: #e8e0c8; } QSplitter::handle:hover { background: #0073ea; }")
+        # ── Splitter with hover-widen effect ──
+        self._splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._splitter.setHandleWidth(1)
+        self._splitter.setStyleSheet("""
+            QSplitter::handle { background: transparent; }
+            QSplitter::handle:hover { background: #0073ea; }
+        """)
+        # Set col-resize cursor on splitter handle
+        handle = self._splitter.handle(1) if self._splitter.count() > 1 else None
+        splitter = self._splitter
 
-        # Left panel - folder + note list
-        left = QWidget()
-        left.setMinimumWidth(180)
-        left.setMaximumWidth(500)
-        left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(8, 8, 8, 8)
-        left_layout.setSpacing(6)
+        # ── Left panel - folder + note list ──
+        self._left_panel = QWidget()
+        self._left_panel.setObjectName("notesLeftPanel")
+        self._left_panel.setMinimumWidth(200)
+        self._left_panel.setMaximumWidth(500)
+        left_layout = QVBoxLayout(self._left_panel)
+        left_layout.setContentsMargins(10, 12, 10, 10)
+        left_layout.setSpacing(8)
 
         # Header row
         header = QHBoxLayout()
-        title = QLabel("Notes")
-        title.setFont(QFont("Inter", 14, QFont.Weight.Bold))
-        header.addWidget(title)
+        self.header_title = QLabel("Notes")
+        self.header_title.setFont(QFont("Inter", 15, QFont.Weight.Bold))
+        header.addWidget(self.header_title)
         header.addStretch()
 
         # New folder button
@@ -2399,19 +3235,19 @@ class NotesPage(QWidget):
         new_folder_btn.setFixedSize(28, 28)
         new_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         new_folder_btn.setToolTip("New Folder")
-        new_folder_btn.setStyleSheet("QPushButton { border: none; font-size: 14px; background: transparent; } QPushButton:hover { background: rgba(0,0,0,0.06); border-radius: 6px; }")
+        new_folder_btn.setStyleSheet("QPushButton { border: none; font-size: 14px; background: transparent; border-radius: 6px; } QPushButton:hover { background: rgba(0,0,0,0.06); }")
         new_folder_btn.clicked.connect(self._new_folder)
         header.addWidget(new_folder_btn)
 
         add_btn = QPushButton("+")
         add_btn.setFixedSize(28, 28)
         add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        add_btn.setStyleSheet("QPushButton { background-color: #0073ea; color: white; border: none; border-radius: 14px; font-size: 16px; font-weight: bold; } QPushButton:hover { background-color: #0066d9; }")
+        add_btn.setStyleSheet("QPushButton { background-color: #0073ea; color: white; border: none; border-radius: 14px; font-size: 16px; font-weight: bold; } QPushButton:hover { background-color: #0060c7; }")
         add_btn.clicked.connect(self._new_note)
         header.addWidget(add_btn)
         left_layout.addLayout(header)
 
-        # Folder bar
+        # Folder bar (scrollable)
         self.folder_scroll = QScrollArea()
         self.folder_scroll.setWidgetResizable(True)
         self.folder_scroll.setFixedHeight(34)
@@ -2427,60 +3263,229 @@ class NotesPage(QWidget):
 
         # Search
         self.search = QLineEdit()
-        self.search.setPlaceholderText("Search notes...")
-        self.search.setFixedHeight(28)
-        self.search.textChanged.connect(self._refresh_list)
+        self.search.setPlaceholderText("\U0001F50D Search notes...")
+        self.search.setFixedHeight(32)
+        self.search.setStyleSheet("""
+            QLineEdit {
+                background: rgba(0,0,0,0.05); border: 1px solid #E3E2E0;
+                border-radius: 8px; padding: 4px 12px; font-size: 12px;
+            }
+            QLineEdit:focus { border: 1px solid #0073ea; }
+        """)
+        self.search.textChanged.connect(self._on_search_changed)
         left_layout.addWidget(self.search)
+
+        # Search result count label
+        self.search_count_label = QLabel("")
+        self.search_count_label.setStyleSheet("color: #999; font-size: 10px; border: none; background: transparent; padding-left: 4px;")
+        self.search_count_label.hide()
+        left_layout.addWidget(self.search_count_label)
+
+        # Tag filter section
+        self._tag_filter_label = QLabel("Tags")
+        self._tag_filter_label.setFont(QFont("Inter", 10, QFont.Weight.DemiBold))
+        self._tag_filter_label.setStyleSheet("color: #999; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; border: none; background: transparent; padding-left: 4px;")
+        left_layout.addWidget(self._tag_filter_label)
+
+        self._tag_filter_scroll = QScrollArea()
+        self._tag_filter_scroll.setWidgetResizable(True)
+        self._tag_filter_scroll.setFixedHeight(30)
+        self._tag_filter_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._tag_filter_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._tag_filter_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; } QScrollArea > QWidget > QWidget { background: transparent; }")
+        self._tag_filter_container = QWidget()
+        self._tag_filter_bar = QHBoxLayout(self._tag_filter_container)
+        self._tag_filter_bar.setContentsMargins(0, 0, 0, 0)
+        self._tag_filter_bar.setSpacing(4)
+        self._tag_filter_scroll.setWidget(self._tag_filter_container)
+        left_layout.addWidget(self._tag_filter_scroll)
+        self._active_tag_filter = None  # Currently active tag filter
+
+        # "Recently Edited" section label
+        self.recent_label = QLabel("Recently Edited")
+        self.recent_label.setFont(QFont("Inter", 10, QFont.Weight.DemiBold))
+        self.recent_label.setStyleSheet("color: #999; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; border: none; background: transparent; padding-left: 4px;")
+        left_layout.addWidget(self.recent_label)
 
         # Note list (drag-drop enabled)
         self.note_list = QListWidget()
         self.note_list.setDragDropMode(QListWidget.DragDropMode.InternalMove)
         self.note_list.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self.note_list.setStyleSheet("""
+            QListWidget {
+                background: transparent; border: none; outline: none;
+            }
+            QListWidget::item {
+                border-radius: 8px; margin: 1px 4px; padding: 0px;
+                border-left: 3px solid transparent;
+            }
+            QListWidget::item:hover { background: rgba(0,0,0,0.04); }
+            QListWidget::item:selected {
+                background: rgba(0,115,234,0.08);
+                border-left: 3px solid #0073ea;
+            }
+        """)
         self.note_list.currentRowChanged.connect(self._on_note_selected)
         self.note_list.model().rowsMoved.connect(self._on_rows_moved)
         left_layout.addWidget(self.note_list)
 
-        splitter.addWidget(left)
+        splitter.addWidget(self._left_panel)
 
-        # Right panel - editor
-        right = QWidget()
-        right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(12, 8, 12, 8)
-        right_layout.setSpacing(6)
+        # ── Right panel - editor ──
+        self._right_panel = QWidget()
+        self._right_panel.setObjectName("notesRightPanel")
+        right_layout = QVBoxLayout(self._right_panel)
+        right_layout.setContentsMargins(28, 16, 28, 12)
+        right_layout.setSpacing(4)
 
-        # Note title + folder selector row
+        # Cover/banner stripe
+        self.cover_banner = QFrame()
+        self.cover_banner.setObjectName("coverBanner")
+        self.cover_banner.setFixedHeight(6)
+        self.cover_banner.setStyleSheet("""
+            QFrame#coverBanner {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #0073ea, stop:1 #00b894);
+                border-radius: 8px;
+                min-height: 6px; max-height: 6px;
+            }
+        """)
+        right_layout.addWidget(self.cover_banner)
+        right_layout.addSpacing(8)
+
+        # Breadcrumb: folder > note title
+        self.breadcrumb_label = QLabel("")
+        self.breadcrumb_label.setStyleSheet("color: #999; font-size: 11px; border: none; background: transparent;")
+        right_layout.addWidget(self.breadcrumb_label)
+
+        # ── Note title + controls row ──
         title_row = QHBoxLayout()
+        title_row.setSpacing(8)
         self.note_title = QLineEdit()
-        self.note_title.setPlaceholderText("Note title...")
-        self.note_title.setFont(QFont("Inter", 16, QFont.Weight.Bold))
-        self.note_title.setStyleSheet("border: none; background: transparent; padding: 4px;")
+        self.note_title.setPlaceholderText("Untitled")
+        self.note_title.setFont(QFont("Inter", 28, QFont.Weight.Bold))
+        self.note_title.setStyleSheet("""
+            QLineEdit {
+                border: none; border-bottom: 2px solid transparent;
+                background: transparent; padding: 4px 0px;
+                font-size: 28px; font-weight: bold; color: #37352F;
+            }
+            QLineEdit:focus { border-bottom: 2px solid #E3E2E0; }
+        """)
+        self.note_title.setMinimumHeight(44)
         self.note_title.textChanged.connect(self._save_current)
         title_row.addWidget(self.note_title)
+
+        # Auto-save indicator ("Saving..." / "Saved")
+        self._save_indicator = QLabel("")
+        self._save_indicator.setStyleSheet("color: #999; font-size: 10px; border: none; background: transparent;")
+        self._save_indicator.setFixedWidth(60)
+        title_row.addWidget(self._save_indicator)
 
         # Folder combo for current note
         self.folder_combo = QComboBox()
         self.folder_combo.setFixedWidth(130)
-        self.folder_combo.setFixedHeight(26)
-        self.folder_combo.setStyleSheet("QComboBox { font-size: 11px; padding: 2px 6px; border-radius: 4px; }")
+        self.folder_combo.setFixedHeight(28)
+        self.folder_combo.setStyleSheet("""
+            QComboBox {
+                font-size: 11px; padding: 2px 8px; border-radius: 6px;
+                border: 1px solid #E3E2E0; background: transparent;
+            }
+            QComboBox:hover { border: 1px solid #0073ea; }
+        """)
         self.folder_combo.setToolTip("Move to folder")
         self.folder_combo.currentTextChanged.connect(self._on_folder_changed_for_note)
         title_row.addWidget(self.folder_combo)
 
+        # Export button with dropdown menu
+        self.export_btn = QPushButton("Export \u25be")
+        self.export_btn.setFixedHeight(28)
+        self.export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.export_btn.setStyleSheet("""
+            QPushButton {
+                border: 1px solid #E3E2E0; border-radius: 6px;
+                padding: 2px 10px; font-size: 11px; background: transparent;
+                color: #37352F;
+            }
+            QPushButton:hover { border: 1px solid #0073ea; color: #0073ea; }
+            QPushButton::menu-indicator { image: none; width: 0px; }
+        """)
+        export_menu = QMenu(self)
+        export_menu.setStyleSheet("""
+            QMenu { background: #fff; border: 1px solid #E3E2E0; border-radius: 6px; padding: 4px; }
+            QMenu::item { padding: 5px 16px; border-radius: 4px; font-size: 12px; color: #37352F; }
+            QMenu::item:selected { background: #F7F6F3; }
+        """)
+        export_menu.addAction("Markdown (.md)", self._export_markdown)
+        export_menu.addAction("HTML (.html)", self._export_html)
+        export_menu.addAction("PDF (.pdf)", self._export_pdf)
+        self.export_btn.setMenu(export_menu)
+        title_row.addWidget(self.export_btn)
+
         self.pin_btn = QPushButton("\u2606")
-        self.pin_btn.setFixedSize(28, 28)
+        self.pin_btn.setFixedSize(30, 30)
         self.pin_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.pin_btn.setStyleSheet("border: none; font-size: 16px; background: transparent;")
+        self.pin_btn.setStyleSheet("QPushButton { border: none; font-size: 17px; background: transparent; border-radius: 6px; } QPushButton:hover { background: rgba(0,0,0,0.06); }")
         self.pin_btn.clicked.connect(self._toggle_pin)
         title_row.addWidget(self.pin_btn)
 
         self.del_btn = QPushButton("\u2715")
-        self.del_btn.setFixedSize(28, 28)
+        self.del_btn.setFixedSize(30, 30)
         self.del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.del_btn.setStyleSheet("border: none; font-size: 14px; color: #e2445c; background: transparent;")
+        self.del_btn.setStyleSheet("QPushButton { border: none; font-size: 14px; color: #e2445c; background: transparent; border-radius: 6px; } QPushButton:hover { background: rgba(226,68,92,0.08); }")
         self.del_btn.clicked.connect(self._delete_note)
         title_row.addWidget(self.del_btn)
 
         right_layout.addLayout(title_row)
+
+        # ── Font selector row ──
+        font_row = QHBoxLayout()
+        font_row.setSpacing(6)
+        font_label = QLabel("Font:")
+        font_label.setStyleSheet("font-size: 11px; color: #999; border: none; background: transparent;")
+        font_row.addWidget(font_label)
+        self.font_combo = QComboBox()
+        self.font_combo.addItems(["Sans-serif", "Serif", "Monospace"])
+        self.font_combo.setFixedWidth(110)
+        self.font_combo.setFixedHeight(26)
+        self.font_combo.setStyleSheet("""
+            QComboBox {
+                font-size: 11px; padding: 2px 8px; border-radius: 6px;
+                border: 1px solid #E3E2E0; background: transparent;
+            }
+            QComboBox:hover { border: 1px solid #0073ea; }
+        """)
+        self.font_combo.currentTextChanged.connect(self._on_font_changed)
+        font_row.addWidget(self.font_combo)
+        font_row.addStretch()
+        right_layout.addLayout(font_row)
+
+        # ── Tags bar ──
+        self._tags_widget = QWidget()
+        tags_layout = QHBoxLayout(self._tags_widget)
+        tags_layout.setContentsMargins(0, 2, 0, 2)
+        tags_layout.setSpacing(4)
+        tags_icon = QLabel("Tags:")
+        tags_icon.setStyleSheet("font-size: 10px; font-weight: 600; color: #999; border: none; background: transparent;")
+        tags_layout.addWidget(tags_icon)
+        self._tag_chips_layout = QHBoxLayout()
+        self._tag_chips_layout.setSpacing(4)
+        tags_layout.addLayout(self._tag_chips_layout)
+        self._tag_input = QLineEdit()
+        self._tag_input.setPlaceholderText("Add tag...")
+        self._tag_input.setFixedHeight(24)
+        self._tag_input.setFixedWidth(100)
+        self._tag_input.setStyleSheet("""
+            QLineEdit {
+                font-size: 11px; padding: 2px 6px; border-radius: 6px;
+                border: 1px dashed #ccc; background: transparent;
+            }
+            QLineEdit:focus { border: 1px solid #0073ea; }
+        """)
+        self._tag_input.returnPressed.connect(self._add_tag_from_input)
+        tags_layout.addWidget(self._tag_input)
+        tags_layout.addStretch()
+        right_layout.addWidget(self._tags_widget)
 
         # Linked tasks
         self.linked_tasks_widget = QWidget()
@@ -2503,28 +3508,179 @@ class NotesPage(QWidget):
         lt_layout.addWidget(link_btn)
 
         right_layout.addWidget(self.linked_tasks_widget)
+        right_layout.addSpacing(4)
 
-        # Rich text editor
+        # ── Separator between title area and editor ──
+        title_sep = QFrame()
+        title_sep.setFixedHeight(1)
+        title_sep.setStyleSheet(f"background: {self.theme.get('border', '#E3E2E0')}; border: none; margin: 0 0 4px 0;")
+        right_layout.addWidget(title_sep)
+
+        # ── Rich text editor ──
         self.editor = RichTextEditor(self.theme)
         self.editor.content_changed.connect(self._save_current)
         right_layout.addWidget(self.editor)
 
-        # Metadata
+        # ── Bottom bar: word count + reading time | metadata ──
+        bottom_bar = QHBoxLayout()
+        bottom_bar.setSpacing(16)
+        self.word_count_label = QLabel("")
+        self.word_count_label.setStyleSheet("color: #999; font-size: 10px; border: none; background: transparent;")
+        bottom_bar.addWidget(self.word_count_label)
+        bottom_bar.addStretch()
         self.meta_label = QLabel()
         self.meta_label.setStyleSheet("color: #999; font-size: 10px; border: none;")
-        right_layout.addWidget(self.meta_label)
+        bottom_bar.addWidget(self.meta_label)
+        right_layout.addLayout(bottom_bar)
 
-        splitter.addWidget(right)
+        splitter.addWidget(self._right_panel)
         splitter.setSizes([280, 700])  # default sizes
+
+        # Set cursor on splitter handle after both widgets are added
+        handle = splitter.handle(1)
+        if handle:
+            handle.setCursor(Qt.CursorShape.SplitHCursor)
+
         layout.addWidget(splitter)
 
+        # ── Empty state overlay (shown when no notes exist) ──
+        self._empty_state = QWidget(self._right_panel)
+        self._empty_state.setObjectName("emptyState")
+        empty_layout = QVBoxLayout(self._empty_state)
+        empty_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty_icon = QLabel("\U0001F4DD")
+        empty_icon.setFont(QFont("Inter", 36))
+        empty_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty_icon.setStyleSheet("border: none; background: transparent;")
+        empty_layout.addWidget(empty_icon)
+        empty_msg = QLabel("Create your first note")
+        empty_msg.setFont(QFont("Inter", 14))
+        empty_msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty_msg.setStyleSheet("color: #999; border: none; background: transparent;")
+        empty_layout.addWidget(empty_msg)
+        empty_btn = QPushButton("+")
+        empty_btn.setFixedSize(40, 40)
+        empty_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        empty_btn.setStyleSheet("QPushButton { background-color: #0073ea; color: white; border: none; border-radius: 20px; font-size: 20px; font-weight: bold; } QPushButton:hover { background-color: #0060c7; }")
+        empty_btn.clicked.connect(self._new_note)
+        empty_layout.addWidget(empty_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        self._empty_state.hide()
+
         self._refresh_folders()
+        self._refresh_tag_filter()
         self._refresh_list()
         self._set_editor_enabled(False)
 
-    # ── Folder management ──
+    # ── Keyboard shortcuts ──────────────────────────────────────
+    def _setup_shortcuts(self):
+        """Register all keyboard shortcuts for the notes page."""
+        # Ctrl+N: New note
+        QShortcut(QKeySequence("Ctrl+N"), self, activated=self._new_note)
+        # Ctrl+Delete / Ctrl+Backspace: Delete current note
+        QShortcut(QKeySequence("Ctrl+Delete"), self, activated=self._delete_note)
+        QShortcut(QKeySequence("Ctrl+Backspace"), self, activated=self._delete_note)
+        # Ctrl+Shift+P: Toggle pin
+        QShortcut(QKeySequence("Ctrl+Shift+P"), self, activated=self._toggle_pin)
+        # Ctrl+F: Focus search
+        QShortcut(QKeySequence("Ctrl+F"), self, activated=self._focus_search)
+        # Escape: Clear search and return to editor
+        QShortcut(QKeySequence("Escape"), self, activated=self._escape_search)
+        # Ctrl+Shift+Up/Down: Navigate between notes
+        QShortcut(QKeySequence("Ctrl+Shift+Up"), self, activated=self._prev_note)
+        QShortcut(QKeySequence("Ctrl+Shift+Down"), self, activated=self._next_note)
+        # Ctrl+/: Trigger slash command menu in editor
+        QShortcut(QKeySequence("Ctrl+/"), self, activated=self._trigger_slash_menu)
+
+    def _focus_search(self):
+        """Focus the search input and select its text."""
+        self.search.setFocus()
+        self.search.selectAll()
+
+    def _escape_search(self):
+        """Clear search text and return focus to the editor."""
+        if self.search.hasFocus() or self.search.text():
+            self.search.clear()
+            if self.current_note_id:
+                self.editor.editor.setFocus()
+
+    def _prev_note(self):
+        """Select the previous note in the list."""
+        row = self.note_list.currentRow()
+        if row > 0:
+            self.note_list.setCurrentRow(row - 1)
+
+    def _next_note(self):
+        """Select the next note in the list."""
+        row = self.note_list.currentRow()
+        if row < self.note_list.count() - 1:
+            self.note_list.setCurrentRow(row + 1)
+
+    def _trigger_slash_menu(self):
+        """Open the slash command menu at the current cursor position in the editor."""
+        if not self.current_note_id:
+            return
+        self.editor._slash_active = True
+        self.editor._slash_filter = ""
+        self.editor._slash_menu.filter("")
+        rect = self.editor.editor.cursorRect()
+        global_pos = self.editor.editor.mapToGlobal(rect.bottomLeft())
+        self.editor._slash_menu.move(global_pos.x(), global_pos.y() + 4)
+        self.editor._slash_menu.show()
+        self.editor.editor.setFocus()
+
+    # ── Debounced search ──────────────────────────────────────
+    def _on_search_changed(self):
+        """Start the 150ms debounce timer when search text changes."""
+        self._search_debounce.start()
+
+    def _do_search(self):
+        """Execute the actual search filtering after debounce."""
+        self._refresh_list()
+
+    # ── Word count & breadcrumb ──────────────────────────────
+    def _update_word_count(self):
+        """Update the word count and estimated reading time in the bottom bar."""
+        text = self.editor.get_plain_text()
+        words = len(text.split()) if text.strip() else 0
+        reading_min = max(1, words // 200)
+        self.word_count_label.setText(f"{words} words  \u00B7  {reading_min} min read")
+
+    def _update_breadcrumb(self):
+        """Update the breadcrumb with clickable folder name (11px, gray, folder emoji)."""
+        if not self.current_note_id:
+            self.breadcrumb_label.setText("")
+            return
+        note = self.db.conn.execute("SELECT folder, title FROM notes WHERE id=?", (self.current_note_id,)).fetchone()
+        if note:
+            folder = note["folder"] if note["folder"] else "Notes"
+            # Use rich text for clickable folder
+            t = self.theme
+            link_color = t.get('accent', '#0073ea')
+            self.breadcrumb_label.setTextFormat(Qt.TextFormat.RichText)
+            self.breadcrumb_label.setText(
+                f'<span style="font-size:11px; color:{t.get("text_dim", "#999")};">'
+                f'\U0001F4C1 <a href="folder:{folder}" style="color:{link_color}; text-decoration:none;">{folder}</a>'
+                f'  /  {note["title"]}</span>'
+            )
+            # Connect link click if not already connected
+            try:
+                self.breadcrumb_label.linkActivated.disconnect()
+            except TypeError:
+                pass
+            self.breadcrumb_label.linkActivated.connect(self._on_breadcrumb_click)
+
+    def _on_breadcrumb_click(self, link):
+        """Handle breadcrumb folder click to switch to that folder view."""
+        if link.startswith("folder:"):
+            folder_name = link[7:]
+            if folder_name == "Notes":
+                self._select_folder(None)
+            else:
+                self._select_folder(folder_name)
+
+    # ── Folder management ────────────────────────────────────
     def _refresh_folders(self):
-        """Rebuild the folder button bar."""
+        """Rebuild the folder button bar with note counts."""
         while self.folder_bar.count():
             item = self.folder_bar.takeAt(0)
             if item.widget():
@@ -2533,9 +3689,21 @@ class NotesPage(QWidget):
         folders = self.db.get_note_folders()
         t = self.theme
 
-        def make_btn(label, folder_val, icon=""):
+        # Get note counts per folder
+        all_notes = self.db.get_notes()
+        folder_counts = {}
+        total_count = len(all_notes)
+        for n in all_notes:
+            n = dict(n)
+            f = n.get("folder", "")
+            folder_counts[f] = folder_counts.get(f, 0) + 1
+
+        def make_btn(label, folder_val, icon="", count=0):
             active = self.current_folder == folder_val
-            btn = QPushButton(f"{icon} {label}".strip())
+            display = f"{icon} {label}".strip()
+            if count > 0:
+                display += f" ({count})"
+            btn = QPushButton(display)
             btn.setFixedHeight(26)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             bg = t.get("accent", "#0073ea") if active else "transparent"
@@ -2545,9 +3713,10 @@ class NotesPage(QWidget):
             btn.clicked.connect(lambda: self._select_folder(folder_val))
             return btn
 
-        self.folder_bar.addWidget(make_btn("All", None, ""))
+        self.folder_bar.addWidget(make_btn("All", None, "", total_count))
         for f in folders:
-            btn = make_btn(f, f, "\U0001F4C1")
+            count = folder_counts.get(f, 0)
+            btn = make_btn(f, f, "\U0001F4C1", count)
             # Right-click to rename/delete folder
             btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
             btn.customContextMenuRequested.connect(lambda pos, fn=f, b=btn: self._folder_context_menu(fn, b, pos))
@@ -2581,8 +3750,20 @@ class NotesPage(QWidget):
             self._refresh_list()
 
     def _folder_context_menu(self, folder_name, btn, pos):
+        """Show rename/delete context menu for a folder button."""
         from PyQt6.QtWidgets import QMenu
+        t = self.theme
+        is_dark = t.get('bg', '#fff')[1:3] < '80' if len(t.get('bg', '#fff')) > 3 else False
+        menu_bg = '#252525' if is_dark else '#fff'
+        menu_border = '#373737' if is_dark else '#E3E2E0'
+        menu_hover = '#2D2D2D' if is_dark else '#F7F6F3'
+        menu_text = '#E3E2E0' if is_dark else '#37352F'
         menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{ background: {menu_bg}; border: 1px solid {menu_border}; border-radius: 6px; padding: 4px; }}
+            QMenu::item {{ padding: 6px 16px; border-radius: 4px; font-size: 12px; color: {menu_text}; }}
+            QMenu::item:selected {{ background: {menu_hover}; }}
+        """)
         rename_act = menu.addAction("Rename Folder")
         delete_act = menu.addAction("Delete Folder")
         action = menu.exec(btn.mapToGlobal(pos))
@@ -2625,6 +3806,7 @@ class NotesPage(QWidget):
         self.db.update_note(self.current_note_id, folder=folder_val)
         self._refresh_folders()
         self._refresh_list()
+        self._update_breadcrumb()
 
     def _sync_folder_combo(self):
         """Set the folder combo to match the current note's folder."""
@@ -2644,7 +3826,7 @@ class NotesPage(QWidget):
             self.folder_combo.setCurrentIndex(0)
         self.folder_combo.blockSignals(False)
 
-    # ── Drag reorder ──
+    # ── Drag reorder ───────────────────────────────────────────
     def _on_rows_moved(self, *args):
         """After drag-drop reorder, persist the new order to DB."""
         new_order = []
@@ -2660,41 +3842,132 @@ class NotesPage(QWidget):
             self._notes_cache = [id_to_note[nid] for nid in new_order if nid in id_to_note]
 
     def _set_editor_enabled(self, enabled):
+        """Enable or disable the editor panel; show empty state when no note is selected."""
         self.note_title.setEnabled(enabled)
         self.editor.editor.setEnabled(enabled)
         self.pin_btn.setEnabled(enabled)
         self.del_btn.setEnabled(enabled)
         self.folder_combo.setEnabled(enabled)
+        self.font_combo.setEnabled(enabled)
         self.linked_tasks_widget.setVisible(enabled)
+        self._tags_widget.setVisible(enabled)
+        self.cover_banner.setVisible(enabled)
+        self._save_indicator.setVisible(enabled)
+        # Show/hide empty state
+        has_notes = hasattr(self, '_notes_cache') and len(self._notes_cache) > 0
+        self._empty_state.setVisible(not enabled and not has_notes)
         if not enabled:
             self.note_title.clear()
             self.editor.set_html("")
-            self.meta_label.setText("Select or create a note")
+            self.meta_label.setText("Select or create a note" if has_notes else "")
+            self.word_count_label.setText("")
+            self.breadcrumb_label.setText("")
+
+    def _get_plain_preview(self, content):
+        """Extract a plain-text preview (max 80 chars) from HTML content.
+
+        Strips all HTML tags, collapses whitespace, and handles special characters.
+        """
+        if not content:
+            return ""
+        import re
+        import html as html_mod
+        # Strip HTML tags
+        text = re.sub(r'<[^>]+>', ' ', content)
+        # Decode HTML entities (handles &lt; &gt; &amp; &quot; etc.)
+        text = html_mod.unescape(text)
+        # Collapse whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text[:80]
 
     def _refresh_list(self):
+        """Rebuild the note list from database, applying folder, tag, and search filters."""
+        import re as _re
+        import html as _html_mod
         self.note_list.blockSignals(True)
         self.note_list.clear()
         search = self.search.text().lower() if hasattr(self, 'search') else ""
         notes = self.db.get_notes()
         self._notes_cache = []
+        all_folders = set(self.db.get_note_folders()) if hasattr(self.db, 'get_note_folders') else set()
+        match_count = 0
+
         for n in notes:
             n = dict(n)
             # Filter by folder
             if self.current_folder is not None:
                 if n.get("folder", "") != self.current_folder:
                     continue
-            # Filter by search
-            if search and search not in n["title"].lower() and search not in n.get("content", "").lower():
-                continue
+            # Filter by active tag filter
+            if hasattr(self, '_active_tag_filter') and self._active_tag_filter:
+                note_tags = [t.strip() for t in n.get("tags", "").split(",") if t.strip()]
+                if self._active_tag_filter not in note_tags:
+                    continue
+            # Filter by search (title + plain-text content)
+            if search:
+                plain_content = _re.sub(r'<[^>]+>', ' ', n.get("content", ""))
+                plain_content = _html_mod.unescape(plain_content)
+                plain_content = _re.sub(r'\s+', ' ', plain_content).strip()
+                if search not in n["title"].lower() and search not in plain_content.lower():
+                    continue
+                match_count += 1
+
+            # Handle deleted folder: if note references a folder that no longer exists
+            note_folder = n.get("folder", "")
+            if note_folder and note_folder not in all_folders:
+                note_folder = "Unfiled"
+
             self._notes_cache.append(n)
-            pin = "\u2605 " if n["pinned"] else ""
-            folder_tag = f"[{n['folder']}] " if n.get("folder") and self.current_folder is None else ""
-            item = QListWidgetItem(f"{pin}{folder_tag}{n['title']}")
-            updated = n["updated_at"][:16] if n.get("updated_at") else ""
-            item.setToolTip(f"Folder: {n.get('folder') or '(none)'}  |  Updated: {updated}")
+
+            # Create rich list item with preview
+            preview = self._get_plain_preview(n.get("content", ""))
+            updated = n["updated_at"][:10] if n.get("updated_at") else ""
+            show_folder = self.current_folder is None and bool(n.get("folder"))
+            note_tags = [t.strip() for t in n.get("tags", "").split(",") if t.strip()]
+
+            # Truncate long titles for sidebar display
+            display_title = n["title"]
+            if len(display_title) > 30:
+                display_title = display_title[:28] + "..."
+
+            item = QListWidgetItem()
             item.setData(Qt.ItemDataRole.UserRole, n["id"])
+            item.setSizeHint(QSize(0, 68))
+            item.setToolTip(f"{n['title']}\nFolder: {note_folder or '(none)'}  |  Updated: {n['updated_at'][:16] if n.get('updated_at') else ''}")
             self.note_list.addItem(item)
+
+            widget = NoteItemWidget(
+                title=display_title,
+                preview=preview,
+                date_str=updated,
+                pinned=bool(n["pinned"]),
+                folder=note_folder,
+                show_folder=show_folder,
+                theme=self.theme,
+                highlight=search,
+                tags=note_tags if note_tags else None,
+            )
+            self.note_list.setItemWidget(item, widget)
+
         self.note_list.blockSignals(False)
+
+        # Update search result count
+        if hasattr(self, 'search_count_label'):
+            if search:
+                self.search_count_label.setText(f"{match_count} result{'s' if match_count != 1 else ''}")
+                self.search_count_label.show()
+            else:
+                self.search_count_label.setText("")
+                self.search_count_label.hide()
+
+        # Update the "Recently Edited" label visibility
+        if hasattr(self, 'recent_label'):
+            self.recent_label.setVisible(len(self._notes_cache) > 0)
+
+        # Show/hide empty state
+        if hasattr(self, '_empty_state'):
+            has_notes = len(self._notes_cache) > 0
+            self._empty_state.setVisible(not has_notes and not self.current_note_id)
 
         # Re-select current note
         if self.current_note_id:
@@ -2704,6 +3977,12 @@ class NotesPage(QWidget):
                     break
 
     def _on_note_selected(self, row):
+        """Handle note selection: auto-save previous, load new note, warn on large content."""
+        # Auto-save previous note before switching (prevent data loss)
+        if self.current_note_id and self._save_timer.isActive():
+            self._save_timer.stop()
+            self._do_save()
+
         if row < 0 or row >= len(self._notes_cache):
             self._set_editor_enabled(False)
             self.current_note_id = None
@@ -2718,14 +3997,51 @@ class NotesPage(QWidget):
         self.note_title.blockSignals(False)
 
         self.editor.editor.blockSignals(True)
-        self.editor.set_html(note.get("content", ""))
+        content = note.get("content", "")
+        self.editor.set_html(content)
         self.editor.editor.blockSignals(False)
 
+        # Track last saved state for efficient save comparisons
+        self._last_saved_title = note["title"]
+        self._last_saved_content = self.editor.get_html()
+
+        # Warn about very large notes
+        if len(content) > 100000:
+            self.meta_label.setText(f"Large note ({len(content)//1000}K chars - may be slow)  |  Created: {note['created_at'][:16]}")
+        else:
+            self.meta_label.setText(f"Created: {note['created_at'][:16]}  |  Updated: {note['updated_at'][:16]}")
+
         self.pin_btn.setText("\u2605" if note["pinned"] else "\u2606")
-        self.meta_label.setText(f"Created: {note['created_at'][:16]}  |  Updated: {note['updated_at'][:16]}")
+
+        # Load font preference
+        note_font = note.get("font", "Sans-serif") or "Sans-serif"
+        self.font_combo.blockSignals(True)
+        idx = self.font_combo.findText(note_font)
+        if idx >= 0:
+            self.font_combo.setCurrentIndex(idx)
+        else:
+            self.font_combo.setCurrentIndex(0)
+        self.font_combo.blockSignals(False)
+        # Apply font to editor
+        families = FONT_FAMILIES.get(note_font, FONT_FAMILIES['Sans-serif'])
+        self.editor.editor.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {self.theme['card_bg']};
+                color: {self.theme['text']};
+                border: none;
+                border-radius: 8px;
+                padding: 20px 28px;
+                font-size: 14px;
+                font-family: {families};
+                selection-background-color: rgba(45,125,230,0.25);
+            }}
+        """)
 
         self._sync_folder_combo()
         self._refresh_linked_tasks()
+        self._refresh_tag_chips()
+        self._update_breadcrumb()
+        self._update_word_count()
 
     def _refresh_linked_tasks(self):
         # Clear existing
@@ -2750,28 +4066,54 @@ class NotesPage(QWidget):
             chip.clicked.connect(lambda checked, _nid=nid, _tid=tid: self._unlink_task(_nid, _tid))
             self.linked_tasks_area.addWidget(chip)
 
+    # ── Auto-save with change detection ────────────────────────
     def _save_current(self):
-        """Debounced save - waits 500ms after last keystroke."""
+        """Debounced save - waits 500ms after last keystroke, shows indicator."""
         if not self.current_note_id:
             return
+        self._save_indicator.setText("Saving...")
         self._save_timer.start()
 
     def _do_save(self):
-        """Actually save to DB and update list item text."""
+        """Save to DB only if content actually changed, then update sidebar item."""
         if not self.current_note_id:
             return
         title = self.note_title.text().strip() or "Untitled"
         content = self.editor.get_html()
+
+        # Skip save if nothing changed (efficient saves)
+        if title == self._last_saved_title and content == self._last_saved_content:
+            self._save_indicator.setText("Saved")
+            self._save_indicator_timer.start()
+            return
+
         self.db.update_note(self.current_note_id, title=title, content=content)
+        self._last_saved_title = title
+        self._last_saved_content = content
+
+        # Show "Saved" indicator briefly
+        self._save_indicator.setText("Saved")
+        self._save_indicator_timer.start()
 
         # Update the left-side list item text without triggering full refresh
+        display_title = title if len(title) <= 30 else title[:28] + "..."
         for i in range(self.note_list.count()):
             item = self.note_list.item(i)
             if item and item.data(Qt.ItemDataRole.UserRole) == self.current_note_id:
-                note = self.db.conn.execute("SELECT pinned, folder FROM notes WHERE id=?", (self.current_note_id,)).fetchone()
-                pin = "\u2605 " if note and note["pinned"] else ""
-                folder_tag = f"[{note['folder']}] " if note and note["folder"] and self.current_folder is None else ""
-                item.setText(f"{pin}{folder_tag}{title}")
+                note = self.db.conn.execute("SELECT pinned, folder, tags FROM notes WHERE id=?", (self.current_note_id,)).fetchone()
+                preview = self._get_plain_preview(content)
+                note_tags = [t.strip() for t in note["tags"].split(",") if t.strip()] if note and note["tags"] else []
+                widget = NoteItemWidget(
+                    title=display_title,
+                    preview=preview,
+                    date_str=datetime.now().strftime("%Y-%m-%d"),
+                    pinned=bool(note["pinned"]) if note else False,
+                    folder=note["folder"] if note else "",
+                    show_folder=self.current_folder is None and bool(note and note["folder"]),
+                    theme=self.theme,
+                    tags=note_tags if note_tags else None,
+                )
+                self.note_list.setItemWidget(item, widget)
                 break
 
         # Also update the cache
@@ -2781,7 +4123,98 @@ class NotesPage(QWidget):
                 self._notes_cache[i]["content"] = content
                 break
 
+        self._update_breadcrumb()
+        self._update_word_count()
+
+    # ── Export functions ────────────────────────────────────────
+    def _export_markdown(self):
+        """Export current note as Markdown file."""
+        if self.current_note_id is None:
+            return
+        note = dict(self.db.conn.execute("SELECT * FROM notes WHERE id=?", (self.current_note_id,)).fetchone())
+        if not note:
+            return
+
+        content = self.editor.get_html()
+        md = f"# {note['title']}\n\n"
+        md += self._html_to_markdown(content)
+
+        from PyQt6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getSaveFileName(self, "Export Markdown",
+            f"{note['title']}.md", "Markdown (*.md)")
+        if path:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(md)
+
+    def _html_to_markdown(self, html):
+        """Basic HTML to Markdown conversion."""
+        import re
+        md = html
+        md = re.sub(r'<h1[^>]*>(.*?)</h1>', r'# \1\n\n', md, flags=re.DOTALL)
+        md = re.sub(r'<h2[^>]*>(.*?)</h2>', r'## \1\n\n', md, flags=re.DOTALL)
+        md = re.sub(r'<h3[^>]*>(.*?)</h3>', r'### \1\n\n', md, flags=re.DOTALL)
+        md = re.sub(r'<strong>(.*?)</strong>', r'**\1**', md, flags=re.DOTALL)
+        md = re.sub(r'<b>(.*?)</b>', r'**\1**', md, flags=re.DOTALL)
+        md = re.sub(r'<em>(.*?)</em>', r'*\1*', md, flags=re.DOTALL)
+        md = re.sub(r'<i>(.*?)</i>', r'*\1*', md, flags=re.DOTALL)
+        md = re.sub(r'<del>(.*?)</del>', r'~~\1~~', md, flags=re.DOTALL)
+        md = re.sub(r'<code>(.*?)</code>', r'`\1`', md, flags=re.DOTALL)
+        md = re.sub(r'<blockquote[^>]*>(.*?)</blockquote>', r'> \1\n\n', md, flags=re.DOTALL)
+        md = re.sub(r'<li>(.*?)</li>', r'- \1\n', md, flags=re.DOTALL)
+        md = re.sub(r'<hr\s*/?>', r'\n---\n\n', md)
+        md = re.sub(r'<br\s*/?>', r'\n', md)
+        md = re.sub(r'<p>(.*?)</p>', r'\1\n\n', md, flags=re.DOTALL)
+        md = re.sub(r'<[^>]+>', '', md)  # strip remaining HTML tags
+        md = md.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"')
+        return md.strip()
+
+    def _export_html(self):
+        """Export current note as HTML file."""
+        if self.current_note_id is None:
+            return
+        note = dict(self.db.conn.execute("SELECT * FROM notes WHERE id=?", (self.current_note_id,)).fetchone())
+        if not note:
+            return
+
+        content = self.editor.get_html()
+        html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>{note['title']}</title>
+<style>body{{font-family:-apple-system,sans-serif;max-width:720px;margin:40px auto;padding:0 20px;line-height:1.7;color:#37352F;}}
+h1{{font-size:40px;font-weight:700;}}blockquote{{border-left:3px solid #E3E2E0;padding-left:16px;color:#666;}}
+pre{{background:#F7F6F3;padding:16px;border-radius:6px;overflow-x:auto;}}
+table{{border-collapse:collapse;width:100%;}}th,td{{border:1px solid #E3E2E0;padding:8px 12px;}}th{{background:#F7F6F3;}}</style>
+</head><body><h1>{note['title']}</h1>{content}</body></html>"""
+
+        from PyQt6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getSaveFileName(self, "Export HTML",
+            f"{note['title']}.html", "HTML (*.html)")
+        if path:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(html)
+
+    def _export_pdf(self):
+        """Export current note as PDF via QPrinter."""
+        if self.current_note_id is None:
+            return
+        from PyQt6.QtPrintSupport import QPrinter
+        from PyQt6.QtWidgets import QFileDialog
+
+        note = dict(self.db.conn.execute("SELECT * FROM notes WHERE id=?", (self.current_note_id,)).fetchone())
+        if not note:
+            return
+
+        path, _ = QFileDialog.getSaveFileName(self, "Export PDF",
+            f"{note['title']}.pdf", "PDF (*.pdf)")
+        if not path:
+            return
+
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
+        printer.setOutputFileName(path)
+        self.editor.editor.document().print(printer)
+
+    # ── CRUD operations ─────────────────────────────────────────
     def _new_note(self):
+        """Create a new note and scroll to it smoothly in the list."""
         folder = self.current_folder if self.current_folder is not None else ""
         nid = self.db.add_note("Untitled", "", EVENT_COLORS[len(self.db.get_notes()) % len(EVENT_COLORS)], folder=folder)
         self.current_note_id = nid
@@ -2794,11 +4227,15 @@ class NotesPage(QWidget):
                 break
         if target_row >= 0:
             self.note_list.setCurrentRow(target_row)
+            # Smooth scroll to new item
+            item = self.note_list.item(target_row)
+            self.note_list.scrollToItem(item, QListWidget.ScrollHint.EnsureVisible)
             self._on_note_selected(target_row)
         self.note_title.setFocus()
         self.note_title.selectAll()
 
     def _toggle_pin(self):
+        """Toggle the pinned state of the current note (Ctrl+Shift+P)."""
         if not self.current_note_id:
             return
         note = dict(self.db.conn.execute("SELECT * FROM notes WHERE id=?", (self.current_note_id,)).fetchone())
@@ -2808,6 +4245,7 @@ class NotesPage(QWidget):
         self._refresh_list()
 
     def _delete_note(self):
+        """Delete the current note after confirmation (Ctrl+Delete)."""
         if not self.current_note_id:
             return
         reply = QMessageBox.question(self, "Delete Note", "Delete this note?",
@@ -2819,7 +4257,9 @@ class NotesPage(QWidget):
             self._refresh_folders()
             self._refresh_list()
 
+    # ── Linked tasks ───────────────────────────────────────────
     def _link_task(self):
+        """Open dialog to link an unlinked task to the current note."""
         if not self.current_note_id:
             return
         all_tasks = self.db.get_tasks()
@@ -2838,6 +4278,124 @@ class NotesPage(QWidget):
     def _unlink_task(self, note_id, task_id):
         self.db.unlink_note_task(note_id, task_id)
         self._refresh_linked_tasks()
+
+    # ── Tag management ──────────────────────────────────────────
+    def _add_tag_from_input(self):
+        """Add a tag from the tag input field to the current note."""
+        if not self.current_note_id:
+            return
+        tag = self._tag_input.text().strip()
+        if not tag:
+            return
+        note = self.db.conn.execute("SELECT tags FROM notes WHERE id=?", (self.current_note_id,)).fetchone()
+        existing = [t.strip() for t in note["tags"].split(",") if t.strip()] if note["tags"] else []
+        if tag not in existing:
+            existing.append(tag)
+            self.db.update_note(self.current_note_id, tags=",".join(existing))
+        self._tag_input.clear()
+        self._refresh_tag_chips()
+        self._refresh_tag_filter()
+        self._refresh_list()
+
+    def _remove_tag(self, tag):
+        """Remove a tag from the current note."""
+        if not self.current_note_id:
+            return
+        note = self.db.conn.execute("SELECT tags FROM notes WHERE id=?", (self.current_note_id,)).fetchone()
+        existing = [t.strip() for t in note["tags"].split(",") if t.strip()] if note["tags"] else []
+        if tag in existing:
+            existing.remove(tag)
+            self.db.update_note(self.current_note_id, tags=",".join(existing))
+        self._refresh_tag_chips()
+        self._refresh_tag_filter()
+        self._refresh_list()
+
+    def _refresh_tag_chips(self):
+        """Rebuild the tag chips in the editor area for the current note."""
+        while self._tag_chips_layout.count():
+            item = self._tag_chips_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        if not self.current_note_id:
+            return
+        note = self.db.conn.execute("SELECT tags FROM notes WHERE id=?", (self.current_note_id,)).fetchone()
+        if not note or not note["tags"]:
+            return
+        tags = [t.strip() for t in note["tags"].split(",") if t.strip()]
+        for tag in tags:
+            bg, fg = get_tag_color(tag)
+            chip = QPushButton(f"{tag}  \u00d7")
+            chip.setFixedHeight(22)
+            chip.setCursor(Qt.CursorShape.PointingHandCursor)
+            chip.setStyleSheet(f"""
+                QPushButton {{
+                    background: {bg}; color: {fg}; border: none; border-radius: 11px;
+                    padding: 2px 8px; font-size: 10px; font-weight: 600;
+                }}
+                QPushButton:hover {{ background: {fg}; color: white; }}
+            """)
+            chip.clicked.connect(lambda checked, t=tag: self._remove_tag(t))
+            self._tag_chips_layout.addWidget(chip)
+
+    def _refresh_tag_filter(self):
+        """Rebuild the tag filter chips in the sidebar."""
+        while self._tag_filter_bar.count():
+            item = self._tag_filter_bar.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        all_tags = self.db.get_all_tags()
+        has_tags = len(all_tags) > 0
+        self._tag_filter_label.setVisible(has_tags)
+        self._tag_filter_scroll.setVisible(has_tags)
+
+        if not has_tags:
+            return
+
+        t = self.theme
+        for tag in all_tags:
+            bg, fg = get_tag_color(tag)
+            is_active = self._active_tag_filter == tag
+            if is_active:
+                style = f"QPushButton {{ background: {fg}; color: white; border: none; border-radius: 10px; padding: 2px 8px; font-size: 10px; font-weight: 600; }} QPushButton:hover {{ opacity: 0.85; }}"
+            else:
+                style = f"QPushButton {{ background: {bg}; color: {fg}; border: none; border-radius: 10px; padding: 2px 8px; font-size: 10px; font-weight: 600; }} QPushButton:hover {{ background: {fg}; color: white; }}"
+            btn = QPushButton(tag)
+            btn.setFixedHeight(20)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setStyleSheet(style)
+            btn.clicked.connect(lambda checked, tg=tag: self._toggle_tag_filter(tg))
+            self._tag_filter_bar.addWidget(btn)
+        self._tag_filter_bar.addStretch()
+
+    def _toggle_tag_filter(self, tag):
+        """Toggle a tag filter on/off."""
+        if self._active_tag_filter == tag:
+            self._active_tag_filter = None
+        else:
+            self._active_tag_filter = tag
+        self._refresh_tag_filter()
+        self._refresh_list()
+
+    # ── Font selector ──────────────────────────────────────────
+    def _on_font_changed(self, font_name):
+        """Apply the selected font to the editor and save to note."""
+        if not self.current_note_id:
+            return
+        families = FONT_FAMILIES.get(font_name, FONT_FAMILIES['Sans-serif'])
+        self.editor.editor.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {self.theme['card_bg']};
+                color: {self.theme['text']};
+                border: none;
+                border-radius: 8px;
+                padding: 20px 28px;
+                font-size: 14px;
+                font-family: {families};
+                selection-background-color: rgba(45,125,230,0.25);
+            }}
+        """)
+        self.db.update_note(self.current_note_id, font=font_name)
 
 
 # ─── Task Edit Dialog ────────────────────────────────────────

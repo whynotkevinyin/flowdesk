@@ -22,10 +22,15 @@ function checkAuth(e) {
 
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
-  if (action === 'ping') return json({ ok: true, version: 6 });
+  if (action === 'ping') return json({ ok: true, version: 7 });
   if (!checkAuth(e)) return json({ error: 'Unauthorized', code: 401 });
   if (action === 'init') return json(initSheet());
   if (action === 'getTasks') return json(getAllData());
+  if (action === 'getTasksLight') return json(getAllDataLight());
+  if (action === 'getNoteContent') {
+    const noteId = (e.parameter && e.parameter.noteId) || '';
+    return json(getNoteContentById(noteId));
+  }
   if (action === 'syncAll') {
     try {
       const data = JSON.parse(e.parameter.data);
@@ -352,6 +357,103 @@ function getAllData() {
   };
 }
 
+// ── Light pull: no note content (fast!) ──
+function getAllDataLight() {
+  const ss = ensureSheets();
+
+  // Groups
+  const groupsSheet = ss.getSheetByName('Groups');
+  const groups = [];
+  if (groupsSheet && groupsSheet.getLastRow() > 1) {
+    const gData = groupsSheet.getRange(2,1,groupsSheet.getLastRow()-1,4).getValues();
+    gData.forEach(r => { if(r[0]) groups.push({id:r[0],title:r[1],color:r[2],sortOrder:r[3]}); });
+  }
+  groups.sort((a,b) => a.sortOrder - b.sortOrder);
+
+  // Tasks
+  const tasksSheet = ss.getSheetByName('Tasks');
+  const tasks = [];
+  if (tasksSheet && tasksSheet.getLastRow() > 1) {
+    const tData = tasksSheet.getRange(2,1,tasksSheet.getLastRow()-1,11).getValues();
+    tData.forEach(r => {
+      if(r[0]) tasks.push({id:r[0],groupId:r[1],name:r[2],status:r[3],priority:r[4],
+        dueDate:fmtDate(r[5]),timelineStart:fmtDate(r[6]),timelineEnd:fmtDate(r[7]),notes:r[8]});
+    });
+  }
+
+  // Members
+  const membersSheet = ss.getSheetByName('Members');
+  const members = [];
+  if (membersSheet && membersSheet.getLastRow() > 1) {
+    membersSheet.getRange(2,1,membersSheet.getLastRow()-1,1).getValues().forEach(r => { if(r[0]) members.push(r[0]); });
+  }
+
+  // Events (same as full version)
+  const eventsSheet = ss.getSheetByName('Events');
+  const events = [];
+  const sheetEventIds = new Set();
+  if (eventsSheet && eventsSheet.getLastRow() > 1) {
+    const cols = Math.min(eventsSheet.getLastColumn(), 10);
+    const eData = eventsSheet.getRange(2,1,eventsSheet.getLastRow()-1,cols).getValues();
+    eData.forEach(r => {
+      if(r[0]) {
+        sheetEventIds.add(String(r[0]));
+        events.push({
+          id:String(r[0]), title:r[1], date:fmtDate(r[2]),
+          startTime:r[3]||'', endTime:r[4]||'',
+          color:r[5]||'#0073ea', allDay:r[6]?true:false,
+          gcalId: (cols >= 10 ? String(r[9]||'') : '')
+        });
+      }
+    });
+  }
+  const gcalEvents = pullGCalEvents();
+  gcalEvents.forEach(ge => { if (!sheetEventIds.has(ge.id)) events.push(ge); });
+
+  // Notes — metadata only, NO content (this is what makes it fast)
+  const notesSheet = ss.getSheetByName('Notes');
+  const notes = [];
+  if (notesSheet && notesSheet.getLastRow() > 1) {
+    const nData = notesSheet.getRange(2,1,notesSheet.getLastRow()-1,8).getValues();
+    nData.forEach(r => {
+      if (r[0]) {
+        notes.push({
+          id: String(r[0]), title: r[1], driveFileId: r[2] || '',
+          pinned: r[3] ? true : false, folder: r[4] || '', sortOrder: r[5] || 0,
+          updatedAt: r[7] ? new Date(r[7]).toISOString() : ''
+        });
+      }
+    });
+  }
+
+  return {
+    groups: groups.map(g => ({id:g.id, title:g.title, color:g.color, collapsed:false, tasks: tasks.filter(t=>t.groupId===g.id)})),
+    members: members,
+    events: events,
+    notes: notes
+  };
+}
+
+// ── Get single note content by id ──
+function getNoteContentById(noteId) {
+  const ss = ensureSheets();
+  const notesSheet = ss.getSheetByName('Notes');
+  if (!notesSheet || notesSheet.getLastRow() < 2) return { error: 'Note not found' };
+  const nData = notesSheet.getRange(2,1,notesSheet.getLastRow()-1,8).getValues();
+  for (let i = 0; i < nData.length; i++) {
+    if (String(nData[i][0]) === String(noteId)) {
+      const driveFileId = nData[i][2] || '';
+      const content = driveFileId ? readNoteFromDrive(driveFileId) : '';
+      return {
+        id: String(nData[i][0]), title: nData[i][1], content: content,
+        pinned: nData[i][3] ? true : false, folder: nData[i][4] || '',
+        sortOrder: nData[i][5] || 0
+      };
+    }
+  }
+  return { error: 'Note not found' };
+}
+
 // ── Sync All ──
 function syncAll(fullData) {
   const ss = ensureSheets();
@@ -421,10 +523,10 @@ function syncAll(fullData) {
     });
   }
 
-  // Notes — only overwrite if non-empty
+  // Notes — only overwrite if non-empty; skip Drive write if no content key (incremental sync)
   const ns = ss.getSheetByName('Notes');
   if (ns && fullData.notes && fullData.notes.length > 0) {
-    const existingMap = {};
+    const existingMap = {};  // noteId → driveFileId
     if (ns.getLastRow() > 1) {
       const existing = ns.getRange(2,1,ns.getLastRow()-1,3).getValues();
       existing.forEach(r => { if (r[0] && r[2]) existingMap[String(r[0])] = String(r[2]); });
@@ -433,7 +535,11 @@ function syncAll(fullData) {
     (fullData.notes || []).forEach((n,i) => {
       const noteId = String(n.id);
       const existingFileId = existingMap[noteId] || '';
-      const driveFileId = saveNoteToDrive(noteId, n.title, n.content || '', existingFileId);
+      let driveFileId = existingFileId;
+      // Only write to Drive if content key is present (modified note)
+      if ('content' in n) {
+        driveFileId = saveNoteToDrive(noteId, n.title, n.content || '', existingFileId);
+      }
       ns.getRange(i+2,1,1,8).setValues([[
         noteId, n.title||'', driveFileId, n.pinned?1:0,
         n.folder||'', n.sortOrder||0, n.createdAt||now, now

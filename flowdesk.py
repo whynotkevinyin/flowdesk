@@ -11,6 +11,10 @@ import json
 import sqlite3
 import urllib.request
 import urllib.parse
+try:
+    import requests as _requests
+except ImportError:
+    _requests = None
 import threading
 import calendar as cal_mod
 from datetime import datetime, date, timedelta
@@ -769,14 +773,26 @@ class SyncManager:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
-    def _http_post_as_get(self, url, data_str):
-        encoded = urllib.parse.quote(data_str)
-        key_param = f"&key={urllib.parse.quote(self.api_key)}" if self.api_key else ""
-        full_url = f"{url}?action=syncAll&data={encoded}{key_param}"
-        req = urllib.request.Request(full_url, method="GET")
-        req.add_header("User-Agent", "Flowdesk/1.0")
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+    def _http_post(self, url, data_dict):
+        """Push data via POST using requests (handles Google's 302 correctly)."""
+        data_dict["action"] = "syncAll"
+        data_dict["key"] = self.api_key
+        if _requests:
+            resp = _requests.post(url, json=data_dict, timeout=120)
+            return resp.json()
+        else:
+            # Fallback: GET — strip note content to stay under URL limit
+            lite = json.loads(json.dumps(data_dict))  # deep copy
+            for n in lite.get("notes", []):
+                n["content"] = n.get("content", "")[:200] + "..." if len(n.get("content", "")) > 200 else n.get("content", "")
+            data_str = json.dumps(lite, ensure_ascii=False)
+            encoded = urllib.parse.quote(data_str)
+            key_param = urllib.parse.quote(self.api_key)
+            full_url = f"{url}?action=syncAll&key={key_param}&data={encoded}"
+            req = urllib.request.Request(full_url, method="GET")
+            req.add_header("User-Agent", "Flowdesk/1.0")
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                return json.loads(resp.read().decode("utf-8"))
 
     def pull(self):
         if not self.sync_url:
@@ -848,25 +864,8 @@ class SyncManager:
                                        due_date=rt_due, notes=rt_notes,
                                        progress=int(rt_progress) if rt_progress else 0)
 
-                # 2) Delete local tasks that no longer exist on remote
-                #    (means they were deleted on the web side)
-                for t_name, t_data in local_task_map.items():
-                    if (rg_name, t_name) not in remote_task_keys:
-                        # Don't delete if it's a brand-new local task (never synced)
-                        # Heuristic: if task has default values, it's probably new
-                        if t_data.get("status") != "Not Started" or t_data.get("notes"):
-                            db.conn.execute("DELETE FROM tasks WHERE id=?", (t_data["id"],))
-
-            # 3) Delete local groups that no longer exist on remote
-            for g_name, g_data in local_group_map.items():
-                if g_name not in remote_group_names:
-                    # Only delete if group had tasks that were synced (not brand new)
-                    tasks_in_group = db.get_tasks(g_data["id"])
-                    if len(tasks_in_group) == 0 or any(
-                        t["status"] != "Not Started" or t["notes"] for t in tasks_in_group
-                    ):
-                        db.conn.execute("DELETE FROM tasks WHERE group_id=?", (g_data["id"],))
-                        db.conn.execute("DELETE FROM groups_ WHERE id=?", (g_data["id"],))
+                # NOTE: Never delete local tasks/groups during pull.
+                # Local is authoritative — pull only adds/updates.
 
             # ── Sync Events (Calendar) from remote ──
             remote_events = remote.get("events", [])
@@ -891,35 +890,24 @@ class SyncManager:
                             end_time=rev.get("endTime", "10:00"),
                             color=rev.get("color", "#0073ea"),
                             all_day=1 if rev.get("allDay") else 0)
-                # Remove local events not in remote
-                for ev_title, ev_data in local_ev_titles.items():
-                    if ev_title not in remote_ev_titles:
-                        db.delete_event(ev_data["id"])
+                # NOTE: Never delete local events during pull.
+                # Local is authoritative — pull only adds/updates.
 
-            # ── Sync Notes from remote ──
+            # ── Sync Notes from remote (add only, never delete local) ──
             remote_notes = remote.get("notes", [])
-            if remote_notes is not None:
+            if remote_notes:
                 local_notes = db.get_notes()
                 local_note_titles = {n["title"]: dict(n) for n in local_notes}
-                remote_note_titles = set()
                 for rn in remote_notes:
                     t = rn.get("title", "")
-                    remote_note_titles.add(t)
+                    if not t or t in local_note_titles:
+                        continue  # skip existing — local is authoritative
+                    # Only add notes that don't exist locally
                     folder = rn.get("folder", "")
-                    sort_order = rn.get("sortOrder", rn.get("sort_order", 0))
-                    if t in local_note_titles:
-                        ln = local_note_titles[t]
-                        db.update_note(ln["id"],
-                            content=rn.get("content", ""),
-                            pinned=1 if rn.get("pinned") else 0,
-                            folder=folder, sort_order=sort_order)
-                    else:
-                        nid = db.add_note(t, rn.get("content", ""), folder=folder)
-                        db.update_note(nid, pinned=1 if rn.get("pinned") else 0, sort_order=sort_order)
-                # Remove local notes not in remote
-                for n_title, n_data in local_note_titles.items():
-                    if n_title not in remote_note_titles:
-                        db.delete_note(n_data["id"])
+                    nid = db.add_note(t, rn.get("content", ""), folder=folder)
+                    db.update_note(nid,
+                        pinned=1 if rn.get("pinned") else 0,
+                        sort_order=rn.get("sortOrder", rn.get("sort_order", 0)))
 
             db.conn.commit()
             db.conn.close()
@@ -971,19 +959,21 @@ class SyncManager:
                     "allDay": bool(ev["all_day"]),
                 })
 
-            # Notes
+            # Notes — full content sent; stored in Google Drive files (no size limit)
             push_data["notes"] = []
             for n in db.get_notes():
                 nd = dict(n)
                 push_data["notes"].append({
                     "id": str(nd["id"]), "title": nd["title"],
-                    "content": nd["content"], "pinned": bool(nd["pinned"]),
+                    "content": nd.get("content", ""),
+                    "pinned": bool(nd["pinned"]),
                     "folder": nd.get("folder", ""),
                     "sortOrder": nd.get("sort_order", 0),
                 })
 
-            data_str = json.dumps(push_data, ensure_ascii=False)
-            self._http_post_as_get(self.sync_url, data_str)
+            result = self._http_post(self.sync_url, push_data)
+            if result.get("code") == 401:
+                raise Exception("Unauthorized — check your API Key")
 
             # Push succeeded — clear deletion records (remote now matches local)
             db.clear_sync_deletions()
@@ -999,9 +989,10 @@ class SyncManager:
             return False
 
     def sync(self):
-        ok = self.pull()
+        # Push first (local is authoritative), then pull to pick up remote-only items
+        ok = self.push()
         if ok:
-            ok = self.push()
+            ok = self.pull()
         return ok
 
 
@@ -1953,9 +1944,15 @@ class NotesPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
+        # Splitter for resizable left/right panels
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setHandleWidth(3)
+        splitter.setStyleSheet("QSplitter::handle { background: #e8e0c8; } QSplitter::handle:hover { background: #0073ea; }")
+
         # Left panel - folder + note list
         left = QWidget()
-        left.setFixedWidth(280)
+        left.setMinimumWidth(180)
+        left.setMaximumWidth(500)
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(8, 8, 8, 8)
         left_layout.setSpacing(6)
@@ -2013,13 +2010,7 @@ class NotesPage(QWidget):
         self.note_list.model().rowsMoved.connect(self._on_rows_moved)
         left_layout.addWidget(self.note_list)
 
-        layout.addWidget(left)
-
-        # Separator
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.VLine)
-        sep.setFixedWidth(1)
-        layout.addWidget(sep)
+        splitter.addWidget(left)
 
         # Right panel - editor
         right = QWidget()
@@ -2093,7 +2084,9 @@ class NotesPage(QWidget):
         self.meta_label.setStyleSheet("color: #999; font-size: 10px; border: none;")
         right_layout.addWidget(self.meta_label)
 
-        layout.addWidget(right)
+        splitter.addWidget(right)
+        splitter.setSizes([280, 700])  # default sizes
+        layout.addWidget(splitter)
 
         self._refresh_folders()
         self._refresh_list()

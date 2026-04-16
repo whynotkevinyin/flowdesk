@@ -1611,7 +1611,9 @@
 
         /* Notes */
         .notes-container { display: flex; height: calc(100vh - 200px); }
-        .notes-sidebar { width: 280px; border-right: 1px solid #e8e0c8; display: flex; flex-direction: column; }
+        .notes-sidebar { width: 280px; min-width: 180px; max-width: 50vw; border-right: none; display: flex; flex-direction: column; flex-shrink: 0; }
+        .notes-resizer { width: 4px; cursor: col-resize; background: #e8e0c8; transition: background 0.15s; flex-shrink: 0; }
+        .notes-resizer:hover, .notes-resizer.active { background: #0073ea; }
         .notes-sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 12px; gap: 6px; }
         .notes-sidebar-header h3 { font-size: 15px; font-weight: 700; }
         .notes-folder-bar { display: flex; gap: 4px; padding: 0 12px 8px; overflow-x: auto; flex-shrink: 0; }
@@ -1641,6 +1643,8 @@
         .note-empty { display: flex; align-items: center; justify-content: center; flex: 1; color: #999; font-size: 14px; }
 
         body.dark .notes-sidebar { border-color: #4a4a58; }
+        body.dark .notes-resizer { background: #4a4a58; }
+        body.dark .notes-resizer:hover, body.dark .notes-resizer.active { background: #0073ea; }
         body.dark .notes-search { background: #3d3d46; border-color: #4a4a58; color: #e8e8ec; }
         body.dark .folder-chip { border-color: #4a4a58; color: #e8e8ec; }
         body.dark .note-item { border-color: #4a4a58; }
@@ -1653,7 +1657,8 @@
         /* Notes tablet responsive */
         @media (max-width: 768px) {
             .notes-container { flex-direction: column; height: auto; }
-            .notes-sidebar { width: 100%; border-right: none; border-bottom: 1px solid #e8e0c8; max-height: 40vh; }
+            .notes-sidebar { width: 100% !important; min-width: 0; max-width: 100%; border-bottom: 1px solid #e8e0c8; max-height: 40vh; }
+            .notes-resizer { display: none; }
             .note-editor { min-height: 50vh; }
         }
 
@@ -2112,6 +2117,8 @@
         async function pushSync() {
             try {
                 const pushData = {
+                    action: 'syncAll',
+                    key: localStorage.getItem('flowdesk_pin') || '',
                     groups: appData.groups,
                     members: appData.members,
                     events: calendarData.events.map(ev => ({
@@ -2120,12 +2127,18 @@
                         color: ev.color || '#0073ea', allDay: ev.all_day || false
                     })),
                     notes: notesData.notes.map(n => ({
-                        id: n.id, title: n.title, content: n.content, pinned: n.pinned || false,
+                        id: n.id, title: n.title, content: n.content || '',
+                        pinned: n.pinned || false,
                         folder: n.folder || '', sortOrder: n.sort_order || 0
                     }))
                 };
-                const data = encodeURIComponent(JSON.stringify(pushData));
-                const resp = await fetch(getAuthUrl('syncAll') + '&data=' + data);
+                // Use POST — content stored in Google Drive (no size limit)
+                const resp = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(pushData),
+                    redirect: 'follow'
+                });
                 const result = await resp.json();
                 if (result.error) console.error('Push sync error:', result.error);
             } catch (e) { console.error('Push sync failed:', e); }
@@ -3358,7 +3371,8 @@
                 editorHtml = '<div class="note-empty">Select a note or create a new one</div>';
             }
 
-            container.innerHTML = `<div class="notes-container">${sidebarHtml}${editorHtml}</div>`;
+            container.innerHTML = `<div class="notes-container">${sidebarHtml}<div class="notes-resizer" id="notesResizer"></div>${editorHtml}</div>`;
+            initNotesResizer();
 
             // Set folder select value after render
             if (currentNote) {
@@ -3518,6 +3532,43 @@
                 const title = item.querySelector('.note-item-title').textContent.toLowerCase();
                 item.style.display = title.includes(query) ? '' : 'none';
             });
+        }
+
+        // ── Notes resizer (drag to resize sidebar) ──
+        function initNotesResizer() {
+            const resizer = document.getElementById('notesResizer');
+            if (!resizer) return;
+            const sidebar = resizer.previousElementSibling;
+            let startX, startW;
+            function onMouseDown(e) {
+                e.preventDefault();
+                startX = e.clientX || e.touches[0].clientX;
+                startW = sidebar.offsetWidth;
+                resizer.classList.add('active');
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+                document.addEventListener('touchmove', onMouseMove, {passive:false});
+                document.addEventListener('touchend', onMouseUp);
+            }
+            function onMouseMove(e) {
+                e.preventDefault();
+                const x = e.clientX || (e.touches && e.touches[0].clientX) || startX;
+                const newW = Math.max(180, Math.min(window.innerWidth * 0.5, startW + (x - startX)));
+                sidebar.style.width = newW + 'px';
+            }
+            function onMouseUp() {
+                resizer.classList.remove('active');
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                document.removeEventListener('touchmove', onMouseMove);
+                document.removeEventListener('touchend', onMouseUp);
+                localStorage.setItem('flowdesk_notes_sidebar_w', sidebar.offsetWidth);
+            }
+            resizer.addEventListener('mousedown', onMouseDown);
+            resizer.addEventListener('touchstart', onMouseDown, {passive:false});
+            // Restore saved width
+            const saved = localStorage.getItem('flowdesk_notes_sidebar_w');
+            if (saved) sidebar.style.width = saved + 'px';
         }
 
         function closeAllPopups() {

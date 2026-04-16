@@ -1,10 +1,16 @@
 // ============================================================
-// Code.gs — Flowdesk Backend API (v4 - with Security)
+// Code.gs — Flowdesk Backend API (v5 - Drive-based Notes)
+// ============================================================
+// Notes content is stored in Google Drive files (no 50K limit).
+// Google Sheets "Notes" sheet only holds metadata + driveFileId.
 // ============================================================
 
 // ⚠️ CHANGE THESE to your own secrets!
-const API_KEY = 'gBjEq2sv1LBnFPDs-eqg2wDrcp3BBMpjQGa5ZWUmw_E';  // Long key (for desktop app)
-const PIN = 'flow';  // ← Short password for phone/tablet login (change this!)
+const API_KEY = 'gBjEq2sv1LBnFPDs-eqg2wDrcp3BBMpjQGa5ZWUmw_E';
+const PIN = 'flow';
+
+// Folder in Google Drive to store note files
+const DRIVE_FOLDER_NAME = 'Flowdesk_Notes';
 
 function checkAuth(e) {
   const key = (e && e.parameter && e.parameter.key) || '';
@@ -12,13 +18,9 @@ function checkAuth(e) {
 }
 
 function doGet(e) {
-  // Ping is open (for connectivity check only, returns no data)
   const action = (e && e.parameter && e.parameter.action) || '';
-  if (action === 'ping') return json({ ok: true, version: 4 });
-
-  // All other actions require API key
+  if (action === 'ping') return json({ ok: true, version: 5 });
   if (!checkAuth(e)) return json({ error: 'Unauthorized', code: 401 });
-
   if (action === 'init') return json(initSheet());
   if (action === 'getTasks') return json(getAllData());
   if (action === 'syncAll') {
@@ -34,7 +36,6 @@ function doGet(e) {
 
 function doPost(e) {
   try {
-    // Check key from query param or body
     const paramKey = (e && e.parameter && e.parameter.key) || '';
     const body = JSON.parse(e.postData.contents);
     const bodyKey = body.key || '';
@@ -54,12 +55,51 @@ function json(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// ── Get or create the Drive folder for notes ──
+function getNotesFolder() {
+  const folders = DriveApp.getFoldersByName(DRIVE_FOLDER_NAME);
+  if (folders.hasNext()) return folders.next();
+  return DriveApp.createFolder(DRIVE_FOLDER_NAME);
+}
+
+// ── Save note content to Drive, return file ID ──
+function saveNoteToDrive(noteId, title, content, existingFileId) {
+  const folder = getNotesFolder();
+
+  // Try to update existing file
+  if (existingFileId) {
+    try {
+      const file = DriveApp.getFileById(existingFileId);
+      file.setContent(content || '');
+      file.setName('note_' + noteId + '_' + (title || 'untitled').substring(0, 50));
+      return existingFileId;
+    } catch (e) {
+      // File not found — create new one
+    }
+  }
+
+  // Create new file
+  const fileName = 'note_' + noteId + '_' + (title || 'untitled').substring(0, 50);
+  const file = folder.createFile(fileName, content || '', MimeType.PLAIN_TEXT);
+  return file.getId();
+}
+
+// ── Read note content from Drive ──
+function readNoteFromDrive(fileId) {
+  if (!fileId) return '';
+  try {
+    const file = DriveApp.getFileById(fileId);
+    return file.getBlob().getDataAsString();
+  } catch (e) {
+    return '[Error reading note: ' + e.message + ']';
+  }
+}
+
 // ── Initialize Sheets ──
 function initSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const headerStyle = { bg: '#292f4c', fg: '#fff' };
 
-  // Tasks sheet
   let tasksSheet = ss.getSheetByName('Tasks');
   if (!tasksSheet) {
     tasksSheet = ss.insertSheet('Tasks');
@@ -69,7 +109,6 @@ function initSheet() {
     tasksSheet.setColumnWidths(1,11,140);
   }
 
-  // Groups sheet
   let groupsSheet = ss.getSheetByName('Groups');
   if (!groupsSheet) {
     groupsSheet = ss.insertSheet('Groups');
@@ -80,7 +119,6 @@ function initSheet() {
     groupsSheet.appendRow(['g2','Completed','#00c875',2]);
   }
 
-  // Members sheet
   let membersSheet = ss.getSheetByName('Members');
   if (!membersSheet) {
     membersSheet = ss.insertSheet('Members');
@@ -89,7 +127,6 @@ function initSheet() {
     membersSheet.appendRow(['Kevin']);
   }
 
-  // Events sheet (Calendar)
   let eventsSheet = ss.getSheetByName('Events');
   if (!eventsSheet) {
     eventsSheet = ss.insertSheet('Events');
@@ -99,11 +136,11 @@ function initSheet() {
     eventsSheet.setColumnWidths(1,9,140);
   }
 
-  // Notes sheet
+  // Notes sheet — v5: driveFileId instead of content
   let notesSheet = ss.getSheetByName('Notes');
   if (!notesSheet) {
     notesSheet = ss.insertSheet('Notes');
-    notesSheet.appendRow(['id','title','content','pinned','folder','sortOrder','createdAt','updatedAt']);
+    notesSheet.appendRow(['id','title','driveFileId','pinned','folder','sortOrder','createdAt','updatedAt']);
     notesSheet.getRange(1,1,1,8).setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
     notesSheet.setFrozenRows(1);
     notesSheet.setColumnWidths(1,8,140);
@@ -112,10 +149,12 @@ function initSheet() {
   const sheet1 = ss.getSheetByName('Sheet1');
   if (sheet1 && ss.getSheets().length > 1) ss.deleteSheet(sheet1);
 
+  // Ensure Drive folder exists
+  getNotesFolder();
+
   return { success: true };
 }
 
-// ── Helper: ensure all sheets exist ──
 function ensureSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss.getSheetByName('Groups') || !ss.getSheetByName('Tasks') || !ss.getSheetByName('Events') || !ss.getSheetByName('Notes')) {
@@ -165,13 +204,20 @@ function getAllData() {
     });
   }
 
-  // Notes
+  // Notes — read content from Drive files
   const notesSheet = ss.getSheetByName('Notes');
   const notes = [];
   if (notesSheet && notesSheet.getLastRow() > 1) {
     const nData = notesSheet.getRange(2,1,notesSheet.getLastRow()-1,8).getValues();
     nData.forEach(r => {
-      if(r[0]) notes.push({id:String(r[0]), title:r[1], content:r[2], pinned:r[3]?true:false, folder:r[4]||'', sortOrder:r[5]||0});
+      if (r[0]) {
+        const driveFileId = r[2] || '';
+        const content = driveFileId ? readNoteFromDrive(driveFileId) : '';
+        notes.push({
+          id: String(r[0]), title: r[1], content: content,
+          pinned: r[3] ? true : false, folder: r[4] || '', sortOrder: r[5] || 0
+        });
+      }
     });
   }
 
@@ -219,7 +265,7 @@ function syncAll(fullData) {
     fullData.members.forEach((m,i) => { ms.getRange(i+2,1).setValue(m); });
   }
 
-  // Events (Calendar)
+  // Events
   const es = ss.getSheetByName('Events');
   if (es && fullData.events) {
     if (es.getLastRow() > 1) es.getRange(2,1,es.getLastRow()-1,9).clearContent();
@@ -231,13 +277,24 @@ function syncAll(fullData) {
     });
   }
 
-  // Notes
+  // Notes — save content to Drive, store fileId in sheet
   const ns = ss.getSheetByName('Notes');
   if (ns && fullData.notes) {
-    if (ns.getLastRow() > 1) ns.getRange(2,1,ns.getLastRow()-1,8).clearContent();
+    // Read existing driveFileId mappings so we can update existing files
+    const existingMap = {};  // noteId → driveFileId
+    if (ns.getLastRow() > 1) {
+      const existing = ns.getRange(2,1,ns.getLastRow()-1,3).getValues();
+      existing.forEach(r => { if (r[0] && r[2]) existingMap[String(r[0])] = String(r[2]); });
+      ns.getRange(2,1,ns.getLastRow()-1,8).clearContent();
+    }
+
     (fullData.notes || []).forEach((n,i) => {
+      const noteId = String(n.id);
+      const existingFileId = existingMap[noteId] || '';
+      const driveFileId = saveNoteToDrive(noteId, n.title, n.content || '', existingFileId);
       ns.getRange(i+2,1,1,8).setValues([[
-        n.id, n.title||'', n.content||'', n.pinned?1:0, n.folder||'', n.sortOrder||0, n.createdAt||now, now
+        noteId, n.title||'', driveFileId, n.pinned?1:0,
+        n.folder||'', n.sortOrder||0, n.createdAt||now, now
       ]]);
     });
   }

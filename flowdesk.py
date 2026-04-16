@@ -50,9 +50,9 @@ SYNC_URL = ""  # User fills this in via File > Set Sync URL...
 
 STATUSES = ["Not Started", "Working on it", "Waiting for review", "On Hold", "Stuck", "Done"]
 STATUS_COLORS = {
-    "Not Started":        "#c4c4c4",
-    "Working on it":      "#e8830c",
-    "Waiting for review": "#579bfc",
+    "Not Started":        "#797e93",
+    "Working on it":      "#0073ea",
+    "Waiting for review": "#fdab3d",
     "On Hold":            "#a25ddc",
     "Stuck":              "#e2445c",
     "Done":               "#00c875",
@@ -60,10 +60,10 @@ STATUS_COLORS = {
 
 PRIORITIES = ["Critical", "High", "Medium", "Low"]
 PRIORITY_COLORS = {
-    "Critical": "#333333",
-    "High":     "#e2445c",
-    "Medium":   "#e8830c",
-    "Low":      "#579bfc",
+    "Critical": "#e2445c",
+    "High":     "#fc5a5a",
+    "Medium":   "#fdab3d",
+    "Low":      "#66ccff",
 }
 
 GROUP_COLORS = [
@@ -1014,11 +1014,15 @@ class BadgeWidget(QLabel):
             QLabel {{
                 background-color: {color};
                 color: white;
-                border-radius: 12px;
-                padding: 3px 12px;
+                border-radius: 13px;
+                padding: 4px 14px;
                 font-weight: 600;
                 font-size: 11px;
                 border: none;
+            }}
+            QLabel:hover {{
+                background-color: {color};
+                opacity: 0.85;
             }}
         """)
 
@@ -2640,8 +2644,8 @@ class GroupTableWidget(QWidget):
         header.setSpacing(6)
 
         color_bar = QFrame()
-        color_bar.setFixedSize(3, 20)
-        color_bar.setStyleSheet(f"background-color: {self.group['color']}; border-radius: 1px; border: none;")
+        color_bar.setFixedSize(4, 22)
+        color_bar.setStyleSheet(f"background-color: {self.group['color']}; border-radius: 2px; border: none;")
         header.addWidget(color_bar)
 
         self.arrow = QPushButton("\u25bc" if not self.collapsed else "\u25b6")
@@ -2669,11 +2673,11 @@ class GroupTableWidget(QWidget):
         pct = int(done / len(tasks) * 100) if tasks else 0
         prog = QProgressBar()
         prog.setValue(pct)
-        prog.setFixedSize(80, 6)
+        prog.setFixedSize(90, 6)
         prog.setTextVisible(False)
         prog.setStyleSheet(f"""
             QProgressBar {{ border: none; border-radius: 3px; background-color: {t['border']}; }}
-            QProgressBar::chunk {{ background-color: {t['accent']}; border-radius: 3px; }}
+            QProgressBar::chunk {{ background-color: {self.group['color']}; border-radius: 3px; }}
         """)
         header.addWidget(prog)
         pct_label = QLabel(f"{pct}%")
@@ -2711,11 +2715,11 @@ class GroupTableWidget(QWidget):
         self.table.setHorizontalHeaderLabels(cols)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
-        self.table.setColumnWidth(0, 32)
-        self.table.setColumnWidth(2, 130)
-        self.table.setColumnWidth(3, 95)
-        self.table.setColumnWidth(4, 90)
-        self.table.setColumnWidth(5, 110)
+        self.table.setColumnWidth(0, 36)
+        self.table.setColumnWidth(2, 140)
+        self.table.setColumnWidth(3, 100)
+        self.table.setColumnWidth(4, 100)
+        self.table.setColumnWidth(5, 120)
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -2753,10 +2757,10 @@ class GroupTableWidget(QWidget):
             self.table_container.hide()
 
         self.table.setStyleSheet(f"""
-            QTableWidget {{ border: none; background-color: {t['card_bg']}; alternate-background-color: {t['card_bg']}; gridline-color: transparent; font-size: 12px; outline: none; }}
-            QTableWidget::item {{ padding: 2px 6px; border-bottom: 1px solid {t['border']}; }}
-            QTableWidget::item:selected {{ background-color: rgba(0, 115, 234, 0.08); }}
-            QHeaderView::section {{ background-color: {t['section_bg']}; border: none; border-bottom: 1px solid {t['border']}; padding: 4px 6px; font-weight: 600; font-size: 11px; color: {t['text_dim']}; }}
+            QTableWidget {{ border: none; background-color: {t['card_bg']}; alternate-background-color: {t['card_bg']}; gridline-color: transparent; font-size: 13px; outline: none; }}
+            QTableWidget::item {{ padding: 4px 8px; border-bottom: 1px solid {t['border']}; }}
+            QTableWidget::item:selected {{ background-color: rgba(0, 115, 234, 0.10); }}
+            QHeaderView::section {{ background-color: {t['section_bg']}; border: none; border-bottom: 2px solid {t['border']}; padding: 6px 8px; font-weight: 700; font-size: 11px; color: {t['text_dim']}; text-transform: uppercase; letter-spacing: 0.5px; }}
         """)
 
         self.setStyleSheet(f"GroupTableWidget {{ background-color: {t['card_bg']}; border: 1px solid {t['border']}; border-radius: 10px; }}")
@@ -2766,7 +2770,7 @@ class GroupTableWidget(QWidget):
         self.table.setRowCount(len(tasks))
         for row, task in enumerate(tasks):
             task = dict(task)
-            self.table.setRowHeight(row, 40)
+            self.table.setRowHeight(row, 44)
 
             cb = QCheckBox()
             cb.setChecked(task["status"] == "Done")
@@ -2781,9 +2785,10 @@ class GroupTableWidget(QWidget):
 
             name_item = QTableWidgetItem(task["name"])
             name_item.setData(Qt.ItemDataRole.UserRole, task["id"])
-            f = QFont("Inter", 13)
+            f = QFont("Inter", 13, QFont.Weight.Medium)
             if task["status"] == "Done":
                 f.setStrikeOut(True)
+                name_item.setForeground(QColor(t["text_dim"]))
             name_item.setFont(f)
             self.table.setItem(row, 1, name_item)
 
@@ -3032,7 +3037,7 @@ class SyncIndicator(QPushButton):
         colors = {
             SyncManager.STATUS_NO_URL: "#888888",
             SyncManager.STATUS_IDLE: "#888888",
-            SyncManager.STATUS_SYNCING: "#e8830c",
+            SyncManager.STATUS_SYNCING: "#fdab3d",
             SyncManager.STATUS_OK: "#00c875",
             SyncManager.STATUS_ERROR: "#e2445c",
         }
@@ -3252,7 +3257,7 @@ class FlowdeskApp(QMainWindow):
         self.summary_labels["Done"].setText(f"Done: {stats['by_status']['Done']}")
         self.summary_labels["Done"].setStyleSheet("font-size: 12px; font-weight: 600; color: #00c875;")
         self.summary_labels["Working"].setText(f"Working: {stats['by_status']['Working on it']}")
-        self.summary_labels["Working"].setStyleSheet("font-size: 12px; font-weight: 600; color: #e8830c;")
+        self.summary_labels["Working"].setStyleSheet("font-size: 12px; font-weight: 600; color: #0073ea;")
         self.summary_labels["Stuck"].setText(f"Stuck: {stats['by_status']['Stuck']}")
         self.summary_labels["Stuck"].setStyleSheet("font-size: 12px; font-weight: 600; color: #e2445c;")
         self.summary_labels["Overdue"].setText(f"Overdue: {stats['overdue']}")

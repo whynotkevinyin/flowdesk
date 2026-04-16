@@ -3104,10 +3104,12 @@
 
             notesData.notes.forEach(n => {
                 const active = n.id === currentNoteId ? ' active' : '';
-                const date = new Date(n.updated_at).toLocaleDateString();
-                sidebarHtml += `<div class="note-item${active}" onclick="selectNote(${n.id})">
+                const rawDate = n.updated_at || n.updatedAt || n.created_at || n.createdAt || '';
+                const date = rawDate ? new Date(rawDate).toLocaleDateString() : '';
+                const safeId = typeof n.id === 'string' ? `'${n.id}'` : n.id;
+                sidebarHtml += `<div class="note-item${active}" onclick="selectNote(${safeId})">
                     <div class="note-item-title">${n.pinned ? '&#128204; ' : ''}${n.title || 'Untitled'}</div>
-                    <div class="note-item-date">${date}</div>
+                    <div class="note-item-date">${date === 'Invalid Date' ? '' : date}</div>
                 </div>`;
             });
 
@@ -3115,9 +3117,14 @@
 
             let editorHtml = '';
             if (currentNote) {
+                const safeId = typeof currentNote.id === 'string' ? `'${currentNote.id}'` : currentNote.id;
+                const createdStr = currentNote.created_at || currentNote.createdAt || '';
+                const updatedStr = currentNote.updated_at || currentNote.updatedAt || '';
+                const createdDisplay = createdStr ? new Date(createdStr).toLocaleString() : '';
+                const updatedDisplay = updatedStr ? new Date(updatedStr).toLocaleString() : '';
                 editorHtml = `<div class="note-editor">
-                    <input class="note-title-input" value="${currentNote.title.replace(/"/g, '&quot;')}"
-                        oninput="updateNoteTitle(${currentNote.id}, this.value)" placeholder="Note title...">
+                    <input class="note-title-input" value="${(currentNote.title || '').replace(/"/g, '&quot;')}"
+                        oninput="updateNoteTitle(${safeId}, this.value)" placeholder="Note title...">
                     <div class="note-toolbar">
                         <button onclick="document.execCommand('bold')" title="Bold"><b>B</b></button>
                         <button onclick="document.execCommand('italic')" title="Italic"><i>I</i></button>
@@ -3127,11 +3134,11 @@
                         <button onclick="document.execCommand('insertOrderedList')" title="Numbered List">1. List</button>
                         <button onclick="document.execCommand('strikeThrough')" title="Strikethrough"><s>S</s></button>
                         <span style="flex:1;"></span>
-                        <button onclick="deleteNote(${currentNote.id})" style="color:#e44258;" title="Delete note">Delete</button>
+                        <button onclick="deleteNote(${safeId})" style="color:#e44258;" title="Delete note">Delete</button>
                     </div>
                     <div class="note-content" contenteditable="true" id="noteContentEditable"
-                        oninput="updateNoteContent(${currentNote.id})">${currentNote.content}</div>
-                    <div class="note-meta">Created: ${new Date(currentNote.created_at).toLocaleString()} | Updated: ${new Date(currentNote.updated_at).toLocaleString()}</div>
+                        oninput="updateNoteContent(${safeId})">${currentNote.content || ''}</div>
+                    <div class="note-meta">${createdDisplay ? 'Created: ' + createdDisplay : ''} ${updatedDisplay ? '| Updated: ' + updatedDisplay : ''}</div>
                 </div>`;
             } else {
                 editorHtml = '<div class="note-empty">Select a note or create a new one</div>';

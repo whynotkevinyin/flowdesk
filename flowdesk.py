@@ -778,7 +778,7 @@ class SyncManager:
         data_dict["action"] = "syncAll"
         data_dict["key"] = self.api_key
         if _requests:
-            resp = _requests.post(url, json=data_dict, timeout=120)
+            resp = _requests.post(url, json=data_dict, timeout=300)
             return resp.json()
         else:
             # Fallback: GET — strip note content to stay under URL limit
@@ -974,6 +974,8 @@ class SyncManager:
             result = self._http_post(self.sync_url, push_data)
             if result.get("code") == 401:
                 raise Exception("Unauthorized — check your API Key")
+            if result.get("error"):
+                raise Exception(f"Sync error: {result['error']}")
 
             # Push succeeded — clear deletion records (remote now matches local)
             db.clear_sync_deletions()
@@ -1915,10 +1917,422 @@ class RichTextEditor(QWidget):
         return self.editor.toHtml()
 
     def set_html(self, html):
-        self.editor.setHtml(html)
+        if not html:
+            self.editor.setHtml("")
+            return
+        stripped = html.strip()
+        # Qt's toHtml() always starts with <!DOCTYPE or <html — use that to
+        # detect "already HTML" vs plain-text / Markdown content.
+        is_html = stripped[:30].lower().startswith(("<!doctype", "<html", "<body"))
+        if is_html:
+            self.editor.setHtml(html)
+        else:
+            # Plain text — escape HTML entities and convert newlines to <br>
+            import html as html_mod
+            escaped = html_mod.escape(html)
+            escaped = escaped.replace("\n", "<br>")
+            self.editor.setHtml(escaped)
 
     def get_plain_text(self):
         return self.editor.toPlainText()
+
+
+# ─── Dashboard Page ──────────────────────────────────────────
+class DashboardPage(QWidget):
+    """Visual overview dashboard with KPI cards, charts, and upcoming tasks."""
+
+    def __init__(self, db, theme, parent=None):
+        super().__init__(parent)
+        self.db = db
+        self.theme = theme
+        self._build()
+
+    def set_theme(self, theme):
+        self.theme = theme
+        self.refresh()
+
+    def _build(self):
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.container = QWidget()
+        self.grid = QGridLayout(self.container)
+        self.grid.setSpacing(16)
+        self.grid.setContentsMargins(20, 20, 20, 20)
+        self.scroll.setWidget(self.container)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.scroll)
+
+    def refresh(self):
+        # Clear existing widgets
+        while self.grid.count():
+            item = self.grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        t = self.theme
+        stats = self.db.get_stats()
+        total = stats["total"]
+        by_status = stats["by_status"]
+        overdue = stats["overdue"]
+        progress = stats["progress"]
+
+        # Gather priority data
+        prio_rows = self.db.conn.execute(
+            "SELECT priority, COUNT(*) as cnt FROM tasks GROUP BY priority"
+        ).fetchall()
+        by_priority = {p: 0 for p in PRIORITIES}
+        for r in prio_rows:
+            if r["priority"] in by_priority:
+                by_priority[r["priority"]] = r["cnt"]
+
+        # Gather group data
+        groups = self.db.get_groups()
+        group_data = []
+        for g in groups:
+            tasks = self.db.get_tasks(g["id"])
+            tasks = [dict(tt) for tt in tasks]
+            done = sum(1 for tt in tasks if tt["status"] == "Done")
+            group_data.append({
+                "name": g["name"], "color": g["color"],
+                "total": len(tasks), "done": done,
+            })
+
+        # Upcoming / overdue tasks
+        upcoming_tasks = self.db.conn.execute(
+            """SELECT t.name, t.status, t.priority, t.due_date, g.name as group_name, g.color as group_color
+               FROM tasks t JOIN groups_ g ON t.group_id = g.id
+               WHERE t.due_date IS NOT NULL AND t.due_date != '' AND t.status != 'Done'
+               ORDER BY t.due_date ASC LIMIT 10"""
+        ).fetchall()
+
+        # ── Row 0: KPI Cards ──
+        kpi_data = [
+            ("Total Tasks", str(total), t["accent"], "📋"),
+            ("Done", str(by_status.get("Done", 0)), "#00c875", "✅"),
+            ("In Progress", str(by_status.get("Working on it", 0)), "#0073ea", "🔄"),
+            ("Stuck", str(by_status.get("Stuck", 0)), "#e2445c", "⚠"),
+            ("Overdue", str(overdue), "#e2445c" if overdue > 0 else "#797e93", "⏰"),
+            ("Completion", f"{progress:.0f}%", "#00c875" if progress >= 50 else "#fdab3d", "📊"),
+        ]
+        for i, (label, value, color, icon) in enumerate(kpi_data):
+            card = self._kpi_card(label, value, color, icon)
+            self.grid.addWidget(card, 0, i)
+
+        # ── Row 1: Status Donut + Priority Bar ──
+        status_chart = self._status_donut(by_status, total)
+        self.grid.addWidget(status_chart, 1, 0, 1, 3)
+
+        priority_chart = self._priority_bars(by_priority, total)
+        self.grid.addWidget(priority_chart, 1, 3, 1, 3)
+
+        # ── Row 2: Group Progress + Upcoming Tasks ──
+        group_card = self._group_progress(group_data)
+        self.grid.addWidget(group_card, 2, 0, 1, 3)
+
+        upcoming_card = self._upcoming_tasks(upcoming_tasks)
+        self.grid.addWidget(upcoming_card, 2, 3, 1, 3)
+
+    def _card_frame(self, title=""):
+        t = self.theme
+        frame = QFrame()
+        frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {t['card_bg']};
+                border: 1px solid {t['border']};
+                border-radius: 10px;
+                padding: 16px;
+            }}
+        """)
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(10)
+        if title:
+            lbl = QLabel(title)
+            lbl.setStyleSheet(f"color: {t['text']}; font-size: 14px; font-weight: 700; border: none; padding: 0;")
+            layout.addWidget(lbl)
+        return frame, layout
+
+    def _kpi_card(self, label, value, color, icon):
+        t = self.theme
+        frame = QFrame()
+        frame.setFixedHeight(100)
+        frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {t['card_bg']};
+                border: 1px solid {t['border']};
+                border-radius: 10px;
+                border-left: 4px solid {color};
+            }}
+        """)
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(4)
+
+        top = QHBoxLayout()
+        icon_lbl = QLabel(icon)
+        icon_lbl.setStyleSheet(f"font-size: 18px; border: none; padding: 0;")
+        top.addWidget(icon_lbl)
+        top.addStretch()
+        layout.addLayout(top)
+
+        val_lbl = QLabel(value)
+        val_lbl.setStyleSheet(f"color: {color}; font-size: 26px; font-weight: 800; border: none; padding: 0;")
+        layout.addWidget(val_lbl)
+
+        name_lbl = QLabel(label)
+        name_lbl.setStyleSheet(f"color: {t['text_dim']}; font-size: 11px; font-weight: 500; border: none; padding: 0;")
+        layout.addWidget(name_lbl)
+
+        return frame
+
+    def _status_donut(self, by_status, total):
+        frame, layout = self._card_frame("Task Status Distribution")
+
+        # Donut chart widget
+        donut = _DonutChartWidget(by_status, STATUS_COLORS, total, self.theme)
+        donut.setFixedHeight(200)
+        layout.addWidget(donut)
+
+        # Legend
+        legend_layout = QHBoxLayout()
+        legend_layout.setSpacing(12)
+        for status, count in by_status.items():
+            if count == 0:
+                continue
+            color = STATUS_COLORS.get(status, "#999")
+            dot = QLabel("●")
+            dot.setStyleSheet(f"color: {color}; font-size: 14px; border: none; padding: 0;")
+            text = QLabel(f"{status}: {count}")
+            text.setStyleSheet(f"color: {self.theme['text']}; font-size: 11px; border: none; padding: 0;")
+            pair = QHBoxLayout()
+            pair.setSpacing(4)
+            pair.addWidget(dot)
+            pair.addWidget(text)
+            legend_layout.addLayout(pair)
+        legend_layout.addStretch()
+        layout.addLayout(legend_layout)
+        return frame
+
+    def _priority_bars(self, by_priority, total):
+        frame, layout = self._card_frame("Priority Breakdown")
+        t = self.theme
+        for prio in ["Critical", "High", "Medium", "Low"]:
+            count = by_priority.get(prio, 0)
+            pct = (count / total * 100) if total > 0 else 0
+            color = PRIORITY_COLORS.get(prio, "#999")
+
+            row = QHBoxLayout()
+            row.setSpacing(8)
+            name = QLabel(prio)
+            name.setFixedWidth(60)
+            name.setStyleSheet(f"color: {t['text']}; font-size: 12px; font-weight: 600; border: none; padding: 0;")
+            row.addWidget(name)
+
+            bar_bg = QFrame()
+            bar_bg.setFixedHeight(22)
+            bar_bg.setStyleSheet(f"background-color: {t['section_bg']}; border-radius: 6px; border: none;")
+            bar_layout = QHBoxLayout(bar_bg)
+            bar_layout.setContentsMargins(0, 0, 0, 0)
+            bar_layout.setSpacing(0)
+
+            bar_fill = QFrame()
+            bar_fill.setFixedHeight(22)
+            fill_width = max(int(pct * 2.5), 0)
+            bar_fill.setFixedWidth(fill_width)
+            bar_fill.setStyleSheet(f"background-color: {color}; border-radius: 6px; border: none;")
+            bar_layout.addWidget(bar_fill)
+            bar_layout.addStretch()
+
+            row.addWidget(bar_bg, 1)
+
+            cnt_lbl = QLabel(f"{count}")
+            cnt_lbl.setFixedWidth(30)
+            cnt_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            cnt_lbl.setStyleSheet(f"color: {color}; font-size: 13px; font-weight: 700; border: none; padding: 0;")
+            row.addWidget(cnt_lbl)
+
+            layout.addLayout(row)
+
+        layout.addStretch()
+        return frame
+
+    def _group_progress(self, group_data):
+        frame, layout = self._card_frame("Group Progress")
+        t = self.theme
+
+        if not group_data:
+            empty = QLabel("No groups yet")
+            empty.setStyleSheet(f"color: {t['text_dim']}; font-size: 12px; border: none;")
+            layout.addWidget(empty)
+            layout.addStretch()
+            return frame
+
+        for g in group_data:
+            row = QHBoxLayout()
+            row.setSpacing(10)
+
+            color_dot = QLabel("●")
+            color_dot.setStyleSheet(f"color: {g['color']}; font-size: 16px; border: none; padding: 0;")
+            row.addWidget(color_dot)
+
+            name = QLabel(g["name"])
+            name.setFixedWidth(100)
+            name.setStyleSheet(f"color: {t['text']}; font-size: 12px; font-weight: 600; border: none; padding: 0;")
+            row.addWidget(name)
+
+            pct = (g["done"] / g["total"] * 100) if g["total"] > 0 else 0
+            bar = QProgressBar()
+            bar.setValue(int(pct))
+            bar.setTextVisible(False)
+            bar.setFixedHeight(16)
+            bar.setStyleSheet(f"""
+                QProgressBar {{
+                    background-color: {t['section_bg']};
+                    border-radius: 8px; border: none;
+                }}
+                QProgressBar::chunk {{
+                    background-color: {g['color']};
+                    border-radius: 8px;
+                }}
+            """)
+            row.addWidget(bar, 1)
+
+            stat = QLabel(f"{g['done']}/{g['total']}")
+            stat.setFixedWidth(45)
+            stat.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            stat.setStyleSheet(f"color: {t['text_dim']}; font-size: 11px; font-weight: 600; border: none; padding: 0;")
+            row.addWidget(stat)
+
+            layout.addLayout(row)
+
+        layout.addStretch()
+        return frame
+
+    def _upcoming_tasks(self, tasks):
+        frame, layout = self._card_frame("Upcoming Deadlines")
+        t = self.theme
+
+        if not tasks:
+            empty = QLabel("No upcoming deadlines 🎉")
+            empty.setStyleSheet(f"color: {t['text_dim']}; font-size: 12px; border: none;")
+            layout.addWidget(empty)
+            layout.addStretch()
+            return frame
+
+        today = date.today()
+        for task in tasks:
+            task = dict(task)
+            try:
+                due = datetime.strptime(task["due_date"], "%Y-%m-%d").date()
+                days_left = (due - today).days
+            except (ValueError, TypeError):
+                continue
+
+            row = QHBoxLayout()
+            row.setSpacing(8)
+
+            # Overdue indicator
+            if days_left < 0:
+                urgency = "🔴"
+                days_text = f"{abs(days_left)}d overdue"
+                days_color = "#e2445c"
+            elif days_left == 0:
+                urgency = "🟡"
+                days_text = "Today"
+                days_color = "#fdab3d"
+            elif days_left <= 3:
+                urgency = "🟡"
+                days_text = f"{days_left}d left"
+                days_color = "#fdab3d"
+            else:
+                urgency = "🟢"
+                days_text = f"{days_left}d left"
+                days_color = "#00c875"
+
+            urg_lbl = QLabel(urgency)
+            urg_lbl.setStyleSheet("font-size: 12px; border: none; padding: 0;")
+            urg_lbl.setFixedWidth(20)
+            row.addWidget(urg_lbl)
+
+            name_lbl = QLabel(task["name"])
+            name_lbl.setStyleSheet(f"color: {t['text']}; font-size: 12px; border: none; padding: 0;")
+            row.addWidget(name_lbl, 1)
+
+            grp_lbl = QLabel(task.get("group_name", ""))
+            grp_lbl.setStyleSheet(f"""
+                color: white; background-color: {task.get('group_color', '#999')};
+                font-size: 10px; font-weight: 600; border-radius: 8px;
+                padding: 2px 8px; border: none;
+            """)
+            row.addWidget(grp_lbl)
+
+            due_lbl = QLabel(days_text)
+            due_lbl.setFixedWidth(75)
+            due_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            due_lbl.setStyleSheet(f"color: {days_color}; font-size: 11px; font-weight: 600; border: none; padding: 0;")
+            row.addWidget(due_lbl)
+
+            layout.addLayout(row)
+
+        layout.addStretch()
+        return frame
+
+
+class _DonutChartWidget(QWidget):
+    """Custom-painted donut chart."""
+
+    def __init__(self, data, colors, total, theme, parent=None):
+        super().__init__(parent)
+        self.data = data
+        self.colors = colors
+        self.total = total
+        self.theme = theme
+
+    def paintEvent(self, event):
+        if self.total == 0:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        w, h = self.width(), self.height()
+        size = min(w, h) - 20
+        x = (w - size) // 2
+        y = (h - size) // 2
+        from PyQt6.QtCore import QRectF
+        rect = QRectF(x, y, size, size)
+
+        start_angle = 90 * 16  # Start at top
+        for status, count in self.data.items():
+            if count == 0:
+                continue
+            span = int(count / self.total * 360 * 16)
+            color = QColor(self.colors.get(status, "#999999"))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(color))
+            painter.drawPie(rect, start_angle, -span)
+            start_angle -= span
+
+        # Inner circle (donut hole)
+        hole_size = size * 0.55
+        hole_x = x + (size - hole_size) / 2
+        hole_y = y + (size - hole_size) / 2
+        hole_rect = QRectF(hole_x, hole_y, hole_size, hole_size)
+        painter.setBrush(QBrush(QColor(self.theme["card_bg"])))
+        painter.drawEllipse(hole_rect)
+
+        # Center text
+        painter.setPen(QPen(QColor(self.theme["text"])))
+        font = painter.font()
+        font.setPointSize(22)
+        font.setWeight(QFont.Weight.Bold)
+        painter.setFont(font)
+        done = self.data.get("Done", 0)
+        pct = int(done / self.total * 100) if self.total > 0 else 0
+        painter.drawText(hole_rect, Qt.AlignmentFlag.AlignCenter, f"{pct}%")
+
+        painter.end()
 
 
 # ─── Notes Page ──────────────────────────────────────────────
@@ -3204,8 +3618,12 @@ class FlowdeskApp(QMainWindow):
         self.summary_layout.addStretch()
         main_layout.addWidget(self.summary_bar)
 
-        # Tab widget - now with 4 tabs
+        # Tab widget - now with 5 tabs
         self.tabs = QTabWidget()
+
+        # Dashboard view
+        self.dashboard_page = DashboardPage(self.db, self.theme)
+        self.tabs.addTab(self.dashboard_page, "Dashboard")
 
         # Table view
         self.table_scroll = QScrollArea()
@@ -3246,6 +3664,8 @@ class FlowdeskApp(QMainWindow):
         self._render_kanban()
         if hasattr(self, 'calendar_view'):
             self.calendar_view._refresh()
+        if hasattr(self, 'dashboard_page'):
+            self.dashboard_page.refresh()
         # Don't refresh notes list while user is actively editing
         # (it would steal focus / disrupt typing)
 
@@ -3382,6 +3802,8 @@ class FlowdeskApp(QMainWindow):
             self.calendar_view.set_theme(t)
         if hasattr(self, 'notes_page'):
             self.notes_page.set_theme(t)
+        if hasattr(self, 'dashboard_page'):
+            self.dashboard_page.set_theme(t)
 
     def _expand_all(self):
         for g in self.db.get_groups():

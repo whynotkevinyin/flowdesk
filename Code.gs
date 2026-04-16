@@ -7,7 +7,7 @@
 
 // ⚠️ CHANGE THESE to your own secrets!
 const API_KEY = 'gBjEq2sv1LBnFPDs-eqg2wDrcp3BBMpjQGa5ZWUmw_E';
-const PIN = 'flow';
+const PIN = 'taiwanno1';
 
 // Folder in Google Drive to store note files
 const DRIVE_FOLDER_NAME = 'Flowdesk_Notes';
@@ -278,8 +278,10 @@ function syncAll(fullData) {
   }
 
   // Notes — save content to Drive, store fileId in sheet
+  // IMPORTANT: only overwrite if the client actually sent notes (non-empty array)
+  // to prevent a client with no local notes from wiping the cloud copy.
   const ns = ss.getSheetByName('Notes');
-  if (ns && fullData.notes) {
+  if (ns && fullData.notes && fullData.notes.length > 0) {
     // Read existing driveFileId mappings so we can update existing files
     const existingMap = {};  // noteId → driveFileId
     if (ns.getLastRow() > 1) {

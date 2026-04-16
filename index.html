@@ -1609,6 +1609,42 @@
         .day-event-title { font-size: 13px; font-weight: 500; }
         body.dark .day-event-card { background: #323240; border-color: #4a4a58; }
 
+        /* Dashboard */
+        .dashboard-container { padding: 20px; }
+        .dashboard-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-bottom: 18px; }
+        .kpi-card { background: var(--card-bg, #fffdf5); border: 1px solid var(--border, #e8e0c8); border-radius: 10px; padding: 14px 16px; border-left: 4px solid var(--kpi-color, #0073ea); }
+        .kpi-card .kpi-icon { font-size: 16px; margin-bottom: 4px; }
+        .kpi-card .kpi-value { font-size: 26px; font-weight: 800; color: var(--kpi-color, #0073ea); line-height: 1.1; }
+        .kpi-card .kpi-label { font-size: 11px; color: #999; font-weight: 500; margin-top: 2px; }
+        .dashboard-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+        .dash-card { background: var(--card-bg, #fffdf5); border: 1px solid var(--border, #e8e0c8); border-radius: 10px; padding: 18px; }
+        .dash-card h3 { font-size: 14px; font-weight: 700; margin: 0 0 14px 0; }
+        .donut-wrap { display: flex; align-items: center; gap: 24px; }
+        .donut-svg { flex-shrink: 0; }
+        .donut-legend { display: flex; flex-direction: column; gap: 6px; }
+        .donut-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+        .donut-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .prio-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .prio-bar-label { width: 60px; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+        .prio-bar-bg { flex: 1; height: 20px; background: var(--section-bg, #f5f3ed); border-radius: 6px; overflow: hidden; }
+        .prio-bar-fill { height: 100%; border-radius: 6px; transition: width 0.4s ease; }
+        .prio-bar-count { width: 28px; text-align: right; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+        .group-prog-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .group-prog-dot { font-size: 16px; flex-shrink: 0; }
+        .group-prog-name { width: 100px; font-size: 12px; font-weight: 600; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .group-prog-bar { flex: 1; height: 14px; background: var(--section-bg, #f5f3ed); border-radius: 7px; overflow: hidden; }
+        .group-prog-fill { height: 100%; border-radius: 7px; transition: width 0.4s ease; }
+        .group-prog-stat { width: 45px; text-align: right; font-size: 11px; font-weight: 600; color: #999; flex-shrink: 0; }
+        .upcoming-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border, #e8e0c8); }
+        .upcoming-row:last-child { border-bottom: none; }
+        .upcoming-urg { width: 18px; text-align: center; font-size: 12px; flex-shrink: 0; }
+        .upcoming-name { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .upcoming-group { font-size: 10px; font-weight: 600; color: white; padding: 2px 8px; border-radius: 8px; flex-shrink: 0; }
+        .upcoming-days { width: 70px; text-align: right; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+        body.dark .kpi-card, body.dark .dash-card { background: #323240; border-color: #4a4a58; }
+        body.dark .prio-bar-bg, body.dark .group-prog-bar { background: #3d3d46; }
+        @media (max-width: 768px) { .dashboard-charts { grid-template-columns: 1fr; } }
+
         /* Notes */
         .notes-container { display: flex; height: calc(100vh - 200px); }
         .notes-sidebar { width: 280px; min-width: 180px; max-width: 50vw; border-right: none; display: flex; flex-direction: column; flex-shrink: 0; }
@@ -1789,13 +1825,15 @@
 
     <div class="container">
         <div class="view-tabs">
-            <button class="view-tab active" data-view="table" id="tableViewBtn">Table</button>
+            <button class="view-tab active" data-view="dashboard" id="dashboardViewBtn">Dashboard</button>
+            <button class="view-tab" data-view="table" id="tableViewBtn">Table</button>
             <button class="view-tab" data-view="kanban" id="kanbanViewBtn">Kanban</button>
             <button id="calendarViewBtn" class="view-tab" data-view="calendar">Calendar</button>
             <button id="notesViewBtn" class="view-tab" data-view="notes">Notes</button>
         </div>
 
-        <div id="tableView" class="groups-container"></div>
+        <div id="dashboardView" class="dashboard-container"></div>
+        <div id="tableView" class="groups-container hidden"></div>
         <div id="kanbanView" class="kanban-container hidden"></div>
         <div id="calendarView" class="hidden"></div>
         <div id="notesView" class="hidden"></div>
@@ -2023,6 +2061,7 @@
             document.getElementById('exportBtn').addEventListener('click', exportJSON);
             document.getElementById('importBtn').addEventListener('click', importJSON);
             document.getElementById('resetBtn').addEventListener('click', resetData);
+            document.getElementById('dashboardViewBtn').addEventListener('click', () => switchView('dashboard'));
             document.getElementById('tableViewBtn').addEventListener('click', () => switchView('table'));
             document.getElementById('kanbanViewBtn').addEventListener('click', () => switchView('kanban'));
             document.getElementById('calendarViewBtn').addEventListener('click', () => switchView('calendar'));
@@ -2246,10 +2285,11 @@
         function switchView(view) {
             document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
             document.querySelector(`.view-tab[data-view="${view}"]`).classList.add('active');
-            ['tableView', 'kanbanView', 'calendarView', 'notesView'].forEach(id => {
+            ['dashboardView', 'tableView', 'kanbanView', 'calendarView', 'notesView'].forEach(id => {
                 document.getElementById(id).classList.toggle('hidden', id !== view + 'View');
             });
-            if (view === 'calendar') renderCalendar();
+            if (view === 'dashboard') renderDashboard();
+            else if (view === 'calendar') renderCalendar();
             else if (view === 'notes') renderNotes();
             else renderApp();
         }
@@ -2257,7 +2297,8 @@
         function renderApp() {
             updateSummary();
             const view = document.querySelector('.view-tab.active').dataset.view;
-            if (view === 'kanban') renderKanban();
+            if (view === 'dashboard') renderDashboard();
+            else if (view === 'kanban') renderKanban();
             else renderTable();
         }
 
@@ -3286,6 +3327,141 @@
                 if (currentNoteFolder !== null && (n.folder || '') !== currentNoteFolder) return false;
                 return true;
             });
+        }
+
+        // ── Dashboard ──
+        function renderDashboard() {
+            const container = document.getElementById('dashboardView');
+            const allTasks = appData.groups.flatMap(g => g.tasks.map(t => ({...t, groupName: g.title, groupColor: g.color})));
+            const total = allTasks.length;
+            const byStatus = {};
+            Object.keys(STATUS_COLORS).forEach(s => byStatus[s] = 0);
+            allTasks.forEach(t => { if (byStatus[t.status] !== undefined) byStatus[t.status]++; });
+            const byPriority = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+            allTasks.forEach(t => { if (byPriority[t.priority] !== undefined) byPriority[t.priority]++; });
+            const done = byStatus['Done'] || 0;
+            const pct = total > 0 ? Math.round(done / total * 100) : 0;
+            const today = new Date().toISOString().slice(0, 10);
+            const overdue = allTasks.filter(t => t.dueDate && t.dueDate < today && t.status !== 'Done').length;
+            const working = byStatus['Working on it'] || 0;
+            const stuck = byStatus['Stuck'] || 0;
+
+            // KPIs
+            const kpis = [
+                { icon: '📋', value: total, label: 'Total Tasks', color: '#0073ea' },
+                { icon: '✅', value: done, label: 'Done', color: '#00c875' },
+                { icon: '🔄', value: working, label: 'In Progress', color: '#0073ea' },
+                { icon: '⚠', value: stuck, label: 'Stuck', color: '#e2445c' },
+                { icon: '⏰', value: overdue, label: 'Overdue', color: overdue > 0 ? '#e2445c' : '#797e93' },
+                { icon: '📊', value: pct + '%', label: 'Completion', color: pct >= 50 ? '#00c875' : '#fdab3d' },
+            ];
+
+            let html = '<div class="dashboard-kpis">';
+            kpis.forEach(k => {
+                html += `<div class="kpi-card" style="--kpi-color:${k.color}">
+                    <div class="kpi-icon">${k.icon}</div>
+                    <div class="kpi-value">${k.value}</div>
+                    <div class="kpi-label">${k.label}</div>
+                </div>`;
+            });
+            html += '</div>';
+
+            // Charts row
+            html += '<div class="dashboard-charts">';
+
+            // Donut chart (SVG)
+            html += '<div class="dash-card"><h3>Task Status Distribution</h3><div class="donut-wrap">';
+            const size = 160, cx = 80, cy = 80, r = 65, ir = 38;
+            let svg = `<svg class="donut-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">`;
+            if (total > 0) {
+                let angle = -90;
+                Object.entries(byStatus).forEach(([status, count]) => {
+                    if (count === 0) return;
+                    const slice = count / total * 360;
+                    const startRad = angle * Math.PI / 180;
+                    const endRad = (angle + slice) * Math.PI / 180;
+                    const largeArc = slice > 180 ? 1 : 0;
+                    const x1 = cx + r * Math.cos(startRad), y1 = cy + r * Math.sin(startRad);
+                    const x2 = cx + r * Math.cos(endRad), y2 = cy + r * Math.sin(endRad);
+                    const ix1 = cx + ir * Math.cos(endRad), iy1 = cy + ir * Math.sin(endRad);
+                    const ix2 = cx + ir * Math.cos(startRad), iy2 = cy + ir * Math.sin(startRad);
+                    svg += `<path d="M${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} L${ix1},${iy1} A${ir},${ir} 0 ${largeArc},0 ${ix2},${iy2} Z" fill="${STATUS_COLORS[status] || '#999'}"/>`;
+                    angle += slice;
+                });
+                svg += `<text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="20" font-weight="800" fill="currentColor">${pct}%</text>`;
+                svg += `<text x="${cx}" y="${cy + 14}" text-anchor="middle" font-size="10" fill="#999">done</text>`;
+            } else {
+                svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#e8e0c8" stroke-width="${r - ir}"/>`;
+                svg += `<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="13" fill="#999">No tasks</text>`;
+            }
+            svg += '</svg>';
+            html += svg;
+            html += '<div class="donut-legend">';
+            Object.entries(byStatus).forEach(([status, count]) => {
+                if (count === 0) return;
+                html += `<div class="donut-legend-item"><div class="donut-legend-dot" style="background:${STATUS_COLORS[status] || '#999'}"></div>${status}: ${count}</div>`;
+            });
+            html += '</div></div></div>';
+
+            // Priority bars
+            html += '<div class="dash-card"><h3>Priority Breakdown</h3>';
+            ['Critical', 'High', 'Medium', 'Low'].forEach(p => {
+                const count = byPriority[p] || 0;
+                const barPct = total > 0 ? (count / total * 100) : 0;
+                const color = PRIORITY_COLORS[p] || '#999';
+                html += `<div class="prio-bar-row">
+                    <div class="prio-bar-label">${p}</div>
+                    <div class="prio-bar-bg"><div class="prio-bar-fill" style="width:${barPct}%; background:${color}"></div></div>
+                    <div class="prio-bar-count" style="color:${color}">${count}</div>
+                </div>`;
+            });
+            html += '</div></div>';
+
+            // Second row: Group Progress + Upcoming
+            html += '<div class="dashboard-charts">';
+
+            // Group progress
+            html += '<div class="dash-card"><h3>Group Progress</h3>';
+            appData.groups.forEach(g => {
+                const gTotal = g.tasks.length;
+                const gDone = g.tasks.filter(t => t.status === 'Done').length;
+                const gPct = gTotal > 0 ? Math.round(gDone / gTotal * 100) : 0;
+                html += `<div class="group-prog-row">
+                    <div class="group-prog-dot" style="color:${g.color}">●</div>
+                    <div class="group-prog-name">${g.title}</div>
+                    <div class="group-prog-bar"><div class="group-prog-fill" style="width:${gPct}%; background:${g.color}"></div></div>
+                    <div class="group-prog-stat">${gDone}/${gTotal}</div>
+                </div>`;
+            });
+            if (appData.groups.length === 0) html += '<div style="color:#999;font-size:12px;">No groups yet</div>';
+            html += '</div>';
+
+            // Upcoming deadlines
+            html += '<div class="dash-card"><h3>Upcoming Deadlines</h3>';
+            const upcoming = allTasks.filter(t => t.dueDate && t.status !== 'Done').sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, 10);
+            if (upcoming.length === 0) {
+                html += '<div style="color:#999;font-size:12px;">No upcoming deadlines 🎉</div>';
+            } else {
+                upcoming.forEach(t => {
+                    const due = new Date(t.dueDate + 'T00:00:00');
+                    const now = new Date(); now.setHours(0,0,0,0);
+                    const diff = Math.round((due - now) / 86400000);
+                    let urg, daysText, daysColor;
+                    if (diff < 0) { urg = '🔴'; daysText = Math.abs(diff) + 'd overdue'; daysColor = '#e2445c'; }
+                    else if (diff === 0) { urg = '🟡'; daysText = 'Today'; daysColor = '#fdab3d'; }
+                    else if (diff <= 3) { urg = '🟡'; daysText = diff + 'd left'; daysColor = '#fdab3d'; }
+                    else { urg = '🟢'; daysText = diff + 'd left'; daysColor = '#00c875'; }
+                    html += `<div class="upcoming-row">
+                        <div class="upcoming-urg">${urg}</div>
+                        <div class="upcoming-name">${t.name}</div>
+                        <div class="upcoming-group" style="background:${t.groupColor}">${t.groupName}</div>
+                        <div class="upcoming-days" style="color:${daysColor}">${daysText}</div>
+                    </div>`;
+                });
+            }
+            html += '</div></div>';
+
+            container.innerHTML = html;
         }
 
         function renderNotes() {

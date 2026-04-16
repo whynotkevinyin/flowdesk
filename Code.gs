@@ -1,8 +1,8 @@
 // ============================================================
-// Code.gs — Flowdesk Backend API (v5 - Drive-based Notes)
+// Code.gs — Flowdesk Backend API (v6 - Drive Notes + Google Calendar Sync)
 // ============================================================
-// Notes content is stored in Google Drive files (no 50K limit).
-// Google Sheets "Notes" sheet only holds metadata + driveFileId.
+// Notes content → Google Drive files (no 50K limit)
+// Events ↔ Google Calendar (bidirectional sync)
 // ============================================================
 
 // ⚠️ CHANGE THESE to your own secrets!
@@ -12,6 +12,9 @@ const PIN = 'taiwanno1';
 // Folder in Google Drive to store note files
 const DRIVE_FOLDER_NAME = 'Flowdesk_Notes';
 
+// Google Calendar name — uses default calendar if empty
+const GCAL_NAME = 'Flowdesk';
+
 function checkAuth(e) {
   const key = (e && e.parameter && e.parameter.key) || '';
   return key === API_KEY || key === PIN;
@@ -19,7 +22,7 @@ function checkAuth(e) {
 
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
-  if (action === 'ping') return json({ ok: true, version: 5 });
+  if (action === 'ping') return json({ ok: true, version: 6 });
   if (!checkAuth(e)) return json({ error: 'Unauthorized', code: 401 });
   if (action === 'init') return json(initSheet());
   if (action === 'getTasks') return json(getAllData());
@@ -55,41 +58,136 @@ function json(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// ── Get or create the Drive folder for notes ──
+// ── Google Calendar helpers ──
+function getFlowdeskCalendar() {
+  // Try to find a calendar named GCAL_NAME
+  if (GCAL_NAME) {
+    const cals = CalendarApp.getCalendarsByName(GCAL_NAME);
+    if (cals.length > 0) return cals[0];
+    // Create it if it doesn't exist
+    return CalendarApp.createCalendar(GCAL_NAME, { color: CalendarApp.Color.BLUE });
+  }
+  return CalendarApp.getDefaultCalendar();
+}
+
+function syncEventToGCal(ev, existingGcalId) {
+  const cal = getFlowdeskCalendar();
+  const dateStr = ev.date || '';
+  if (!dateStr) return '';
+
+  try {
+    const eventDate = new Date(dateStr + 'T00:00:00');
+    let gcalEvent = null;
+
+    // Try to update existing
+    if (existingGcalId) {
+      try { gcalEvent = cal.getEventById(existingGcalId); } catch(e) { gcalEvent = null; }
+    }
+
+    if (gcalEvent) {
+      // Update existing event
+      gcalEvent.setTitle(ev.title || 'Untitled');
+      if (ev.allDay) {
+        gcalEvent.setAllDayDate(eventDate);
+      } else {
+        const start = parseTime(dateStr, ev.startTime || '09:00');
+        const end = parseTime(dateStr, ev.endTime || '10:00');
+        gcalEvent.setTime(start, end);
+      }
+      return existingGcalId;
+    } else {
+      // Create new event
+      if (ev.allDay) {
+        gcalEvent = cal.createAllDayEvent(ev.title || 'Untitled', eventDate);
+      } else {
+        const start = parseTime(dateStr, ev.startTime || '09:00');
+        const end = parseTime(dateStr, ev.endTime || '10:00');
+        gcalEvent = cal.createEvent(ev.title || 'Untitled', start, end);
+      }
+      // Tag it as Flowdesk event
+      gcalEvent.setTag('flowdesk', 'true');
+      gcalEvent.setTag('flowdesk_id', String(ev.id || ''));
+      return gcalEvent.getId();
+    }
+  } catch (e) {
+    Logger.log('syncEventToGCal error: ' + e.message);
+    return existingGcalId || '';
+  }
+}
+
+function parseTime(dateStr, timeStr) {
+  const parts = (timeStr || '09:00').split(':');
+  const h = parseInt(parts[0]) || 9;
+  const m = parseInt(parts[1]) || 0;
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+
+function pullGCalEvents() {
+  // Pull events from Google Calendar that are NOT already tracked by Flowdesk
+  try {
+    const cal = getFlowdeskCalendar();
+    const now = new Date();
+    const start = new Date(now.getTime() - 90 * 86400000);  // 90 days ago
+    const end = new Date(now.getTime() + 365 * 86400000);   // 1 year ahead
+    const gcalEvents = cal.getEvents(start, end);
+    const pulled = [];
+
+    gcalEvents.forEach(ge => {
+      const flowdeskTag = ge.getTag('flowdesk');
+      if (flowdeskTag === 'true') return; // Skip events we pushed — avoid duplicates
+
+      const isAllDay = ge.isAllDayEvent();
+      const startDate = isAllDay ? ge.getAllDayStartDate() : ge.getStartTime();
+      const endDate = isAllDay ? ge.getAllDayEndDate() : ge.getEndTime();
+
+      pulled.push({
+        id: 'gcal_' + ge.getId().replace(/@.*/, '').substring(0, 20),
+        gcalId: ge.getId(),
+        title: ge.getTitle() || 'Untitled',
+        date: Utilities.formatDate(startDate, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+        startTime: isAllDay ? '' : Utilities.formatDate(startDate, Session.getScriptTimeZone(), 'HH:mm'),
+        endTime: isAllDay ? '' : Utilities.formatDate(endDate, Session.getScriptTimeZone(), 'HH:mm'),
+        color: '#0073ea',
+        allDay: isAllDay,
+        fromGCal: true
+      });
+    });
+
+    return pulled;
+  } catch (e) {
+    Logger.log('pullGCalEvents error: ' + e.message);
+    return [];
+  }
+}
+
+// ── Drive helpers ──
 function getNotesFolder() {
   const folders = DriveApp.getFoldersByName(DRIVE_FOLDER_NAME);
   if (folders.hasNext()) return folders.next();
   return DriveApp.createFolder(DRIVE_FOLDER_NAME);
 }
 
-// ── Save note content to Drive, return file ID ──
 function saveNoteToDrive(noteId, title, content, existingFileId) {
   const folder = getNotesFolder();
-
-  // Try to update existing file
   if (existingFileId) {
     try {
       const file = DriveApp.getFileById(existingFileId);
       file.setContent(content || '');
       file.setName('note_' + noteId + '_' + (title || 'untitled').substring(0, 50));
       return existingFileId;
-    } catch (e) {
-      // File not found — create new one
-    }
+    } catch (e) { /* File not found — create new */ }
   }
-
-  // Create new file
   const fileName = 'note_' + noteId + '_' + (title || 'untitled').substring(0, 50);
   const file = folder.createFile(fileName, content || '', MimeType.PLAIN_TEXT);
   return file.getId();
 }
 
-// ── Read note content from Drive ──
 function readNoteFromDrive(fileId) {
   if (!fileId) return '';
   try {
-    const file = DriveApp.getFileById(fileId);
-    return file.getBlob().getDataAsString();
+    return DriveApp.getFileById(fileId).getBlob().getDataAsString();
   } catch (e) {
     return '[Error reading note: ' + e.message + ']';
   }
@@ -127,16 +225,22 @@ function initSheet() {
     membersSheet.appendRow(['Kevin']);
   }
 
+  // Events sheet — v6: added gcalId column (10)
   let eventsSheet = ss.getSheetByName('Events');
   if (!eventsSheet) {
     eventsSheet = ss.insertSheet('Events');
-    eventsSheet.appendRow(['id','title','date','startTime','endTime','color','allDay','createdAt','updatedAt']);
-    eventsSheet.getRange(1,1,1,9).setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
+    eventsSheet.appendRow(['id','title','date','startTime','endTime','color','allDay','createdAt','updatedAt','gcalId']);
+    eventsSheet.getRange(1,1,1,10).setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
     eventsSheet.setFrozenRows(1);
-    eventsSheet.setColumnWidths(1,9,140);
+    eventsSheet.setColumnWidths(1,10,140);
+  } else {
+    // Migrate: add gcalId header if missing
+    const headers = eventsSheet.getRange(1,1,1,10).getValues()[0];
+    if (headers[9] !== 'gcalId') {
+      eventsSheet.getRange(1,10).setValue('gcalId').setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
+    }
   }
 
-  // Notes sheet — v5: driveFileId instead of content
   let notesSheet = ss.getSheetByName('Notes');
   if (!notesSheet) {
     notesSheet = ss.insertSheet('Notes');
@@ -149,8 +253,8 @@ function initSheet() {
   const sheet1 = ss.getSheetByName('Sheet1');
   if (sheet1 && ss.getSheets().length > 1) ss.deleteSheet(sheet1);
 
-  // Ensure Drive folder exists
   getNotesFolder();
+  getFlowdeskCalendar(); // Ensure calendar exists
 
   return { success: true };
 }
@@ -194,17 +298,36 @@ function getAllData() {
     membersSheet.getRange(2,1,membersSheet.getLastRow()-1,1).getValues().forEach(r => { if(r[0]) members.push(r[0]); });
   }
 
-  // Events
+  // Events from Sheets
   const eventsSheet = ss.getSheetByName('Events');
   const events = [];
+  const sheetEventIds = new Set();
   if (eventsSheet && eventsSheet.getLastRow() > 1) {
-    const eData = eventsSheet.getRange(2,1,eventsSheet.getLastRow()-1,9).getValues();
+    const cols = Math.min(eventsSheet.getLastColumn(), 10);
+    const eData = eventsSheet.getRange(2,1,eventsSheet.getLastRow()-1,cols).getValues();
     eData.forEach(r => {
-      if(r[0]) events.push({id:String(r[0]), title:r[1], date:fmtDate(r[2]), startTime:r[3]||'', endTime:r[4]||'', color:r[5]||'#0073ea', allDay:r[6]?true:false});
+      if(r[0]) {
+        sheetEventIds.add(String(r[0]));
+        events.push({
+          id:String(r[0]), title:r[1], date:fmtDate(r[2]),
+          startTime:r[3]||'', endTime:r[4]||'',
+          color:r[5]||'#0073ea', allDay:r[6]?true:false,
+          gcalId: (cols >= 10 ? String(r[9]||'') : '')
+        });
+      }
     });
   }
 
-  // Notes — read content from Drive files
+  // Pull Google Calendar events (non-Flowdesk ones)
+  const gcalEvents = pullGCalEvents();
+  gcalEvents.forEach(ge => {
+    // Only add if not already in our sheet
+    if (!sheetEventIds.has(ge.id)) {
+      events.push(ge);
+    }
+  });
+
+  // Notes
   const notesSheet = ss.getSheetByName('Notes');
   const notes = [];
   if (notesSheet && notesSheet.getLastRow() > 1) {
@@ -265,31 +388,48 @@ function syncAll(fullData) {
     fullData.members.forEach((m,i) => { ms.getRange(i+2,1).setValue(m); });
   }
 
-  // Events
+  // Events — sync to Sheet AND to Google Calendar
   const es = ss.getSheetByName('Events');
-  if (es && fullData.events) {
-    if (es.getLastRow() > 1) es.getRange(2,1,es.getLastRow()-1,9).clearContent();
+  if (es && fullData.events && fullData.events.length > 0) {
+    // Read existing gcalId mappings
+    const existingGcalMap = {};  // eventId → gcalId
+    if (es.getLastRow() > 1) {
+      const cols = Math.min(es.getLastColumn(), 10);
+      const existing = es.getRange(2,1,es.getLastRow()-1,cols).getValues();
+      existing.forEach(r => {
+        if (r[0] && cols >= 10 && r[9]) existingGcalMap[String(r[0])] = String(r[9]);
+      });
+      es.getRange(2,1,es.getLastRow()-1,10).clearContent();
+    }
+
     (fullData.events || []).forEach((ev,i) => {
-      es.getRange(i+2,1,1,9).setValues([[
-        ev.id, ev.title||'', ev.date||'', ev.startTime||'', ev.endTime||'',
-        ev.color||'#0073ea', ev.allDay?1:0, ev.createdAt||now, now
+      const evId = String(ev.id);
+      // Skip Google Calendar-sourced events (don't re-push them)
+      const isFromGCal = ev.fromGCal || evId.startsWith('gcal_');
+      const existingGcalId = existingGcalMap[evId] || ev.gcalId || '';
+
+      let gcalId = existingGcalId;
+      if (!isFromGCal) {
+        // Push Flowdesk events to Google Calendar
+        gcalId = syncEventToGCal(ev, existingGcalId);
+      }
+
+      es.getRange(i+2,1,1,10).setValues([[
+        evId, ev.title||'', ev.date||'', ev.startTime||'', ev.endTime||'',
+        ev.color||'#0073ea', ev.allDay?1:0, ev.createdAt||now, now, gcalId
       ]]);
     });
   }
 
-  // Notes — save content to Drive, store fileId in sheet
-  // IMPORTANT: only overwrite if the client actually sent notes (non-empty array)
-  // to prevent a client with no local notes from wiping the cloud copy.
+  // Notes — only overwrite if non-empty
   const ns = ss.getSheetByName('Notes');
   if (ns && fullData.notes && fullData.notes.length > 0) {
-    // Read existing driveFileId mappings so we can update existing files
-    const existingMap = {};  // noteId → driveFileId
+    const existingMap = {};
     if (ns.getLastRow() > 1) {
       const existing = ns.getRange(2,1,ns.getLastRow()-1,3).getValues();
       existing.forEach(r => { if (r[0] && r[2]) existingMap[String(r[0])] = String(r[2]); });
       ns.getRange(2,1,ns.getLastRow()-1,8).clearContent();
     }
-
     (fullData.notes || []).forEach((n,i) => {
       const noteId = String(n.id);
       const existingFileId = existingMap[noteId] || '';

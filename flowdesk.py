@@ -1956,20 +1956,24 @@ class DashboardPage(QWidget):
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.container = QWidget()
-        self.grid = QGridLayout(self.container)
-        self.grid.setSpacing(16)
-        self.grid.setContentsMargins(20, 20, 20, 20)
+        self.main_vbox = QVBoxLayout(self.container)
+        self.main_vbox.setSpacing(14)
+        self.main_vbox.setContentsMargins(24, 20, 24, 20)
         self.scroll.setWidget(self.container)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.scroll)
 
-    def refresh(self):
-        # Clear existing widgets
-        while self.grid.count():
-            item = self.grid.takeAt(0)
+    def _clear_layout(self, layout):
+        while layout.count():
+            item = layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+            elif item.layout():
+                self._clear_layout(item.layout())
+
+    def refresh(self):
+        self._clear_layout(self.main_vbox)
 
         t = self.theme
         stats = self.db.get_stats()
@@ -2007,32 +2011,37 @@ class DashboardPage(QWidget):
                ORDER BY t.due_date ASC LIMIT 10"""
         ).fetchall()
 
-        # ── Row 0: KPI Cards ──
+        # ── Row 0: KPI Cards (3 + 3) ──
         kpi_data = [
-            ("Total Tasks", str(total), t["accent"], "📋"),
-            ("Done", str(by_status.get("Done", 0)), "#00c875", "✅"),
-            ("In Progress", str(by_status.get("Working on it", 0)), "#0073ea", "🔄"),
-            ("Stuck", str(by_status.get("Stuck", 0)), "#e2445c", "⚠"),
-            ("Overdue", str(overdue), "#e2445c" if overdue > 0 else "#797e93", "⏰"),
-            ("Completion", f"{progress:.0f}%", "#00c875" if progress >= 50 else "#fdab3d", "📊"),
+            ("Total Tasks", str(total), t["accent"]),
+            ("Done", str(by_status.get("Done", 0)), "#00c875"),
+            ("In Progress", str(by_status.get("Working on it", 0)), "#0073ea"),
+            ("Stuck", str(by_status.get("Stuck", 0)), "#e2445c"),
+            ("Overdue", str(overdue), "#e2445c" if overdue > 0 else "#797e93"),
+            ("Completion", f"{progress:.0f}%", "#00c875" if progress >= 50 else "#fdab3d"),
         ]
-        for i, (label, value, color, icon) in enumerate(kpi_data):
-            card = self._kpi_card(label, value, color, icon)
-            self.grid.addWidget(card, 0, i)
+        kpi_row = QHBoxLayout()
+        kpi_row.setSpacing(12)
+        for label, value, color in kpi_data:
+            card = self._kpi_card(label, value, color)
+            kpi_row.addWidget(card)
+        self.main_vbox.addLayout(kpi_row)
 
-        # ── Row 1: Status Donut + Priority Bar ──
-        status_chart = self._status_donut(by_status, total)
-        self.grid.addWidget(status_chart, 1, 0, 1, 3)
-
-        priority_chart = self._priority_bars(by_priority, total)
-        self.grid.addWidget(priority_chart, 1, 3, 1, 3)
+        # ── Row 1: Status Donut + Priority Bars ──
+        row1 = QHBoxLayout()
+        row1.setSpacing(14)
+        row1.addWidget(self._status_donut(by_status, total), 1)
+        row1.addWidget(self._priority_bars(by_priority, total), 1)
+        self.main_vbox.addLayout(row1)
 
         # ── Row 2: Group Progress + Upcoming Tasks ──
-        group_card = self._group_progress(group_data)
-        self.grid.addWidget(group_card, 2, 0, 1, 3)
+        row2 = QHBoxLayout()
+        row2.setSpacing(14)
+        row2.addWidget(self._group_progress(group_data), 1)
+        row2.addWidget(self._upcoming_tasks(upcoming_tasks), 1)
+        self.main_vbox.addLayout(row2)
 
-        upcoming_card = self._upcoming_tasks(upcoming_tasks)
-        self.grid.addWidget(upcoming_card, 2, 3, 1, 3)
+        self.main_vbox.addStretch()
 
     def _card_frame(self, title=""):
         t = self.theme
@@ -2054,10 +2063,10 @@ class DashboardPage(QWidget):
             layout.addWidget(lbl)
         return frame, layout
 
-    def _kpi_card(self, label, value, color, icon):
+    def _kpi_card(self, label, value, color):
         t = self.theme
         frame = QFrame()
-        frame.setFixedHeight(100)
+        frame.setFixedHeight(80)
         frame.setStyleSheet(f"""
             QFrame {{
                 background-color: {t['card_bg']};
@@ -2067,52 +2076,56 @@ class DashboardPage(QWidget):
             }}
         """)
         layout = QVBoxLayout(frame)
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setSpacing(4)
-
-        top = QHBoxLayout()
-        icon_lbl = QLabel(icon)
-        icon_lbl.setStyleSheet(f"font-size: 18px; border: none; padding: 0;")
-        top.addWidget(icon_lbl)
-        top.addStretch()
-        layout.addLayout(top)
+        layout.setContentsMargins(14, 8, 14, 8)
+        layout.setSpacing(2)
+        layout.addStretch()
 
         val_lbl = QLabel(value)
-        val_lbl.setStyleSheet(f"color: {color}; font-size: 26px; font-weight: 800; border: none; padding: 0;")
+        val_lbl.setStyleSheet(f"color: {color}; font-size: 24px; font-weight: 800; border: none; padding: 0;")
         layout.addWidget(val_lbl)
 
         name_lbl = QLabel(label)
-        name_lbl.setStyleSheet(f"color: {t['text_dim']}; font-size: 11px; font-weight: 500; border: none; padding: 0;")
+        name_lbl.setStyleSheet(f"color: {t['text_dim']}; font-size: 11px; font-weight: 600; border: none; padding: 0;")
         layout.addWidget(name_lbl)
+        layout.addStretch()
 
         return frame
 
     def _status_donut(self, by_status, total):
         frame, layout = self._card_frame("Task Status Distribution")
 
-        # Donut chart widget
-        donut = _DonutChartWidget(by_status, STATUS_COLORS, total, self.theme)
-        donut.setFixedHeight(200)
-        layout.addWidget(donut)
+        body = QHBoxLayout()
+        body.setSpacing(20)
 
-        # Legend
-        legend_layout = QHBoxLayout()
-        legend_layout.setSpacing(12)
+        # Donut chart widget (left)
+        donut = _DonutChartWidget(by_status, STATUS_COLORS, total, self.theme)
+        donut.setFixedSize(170, 170)
+        body.addWidget(donut)
+
+        # Legend (right, vertical)
+        legend = QVBoxLayout()
+        legend.setSpacing(6)
+        legend.addStretch()
         for status, count in by_status.items():
             if count == 0:
                 continue
             color = STATUS_COLORS.get(status, "#999")
-            dot = QLabel("●")
-            dot.setStyleSheet(f"color: {color}; font-size: 14px; border: none; padding: 0;")
-            text = QLabel(f"{status}: {count}")
-            text.setStyleSheet(f"color: {self.theme['text']}; font-size: 11px; border: none; padding: 0;")
             pair = QHBoxLayout()
-            pair.setSpacing(4)
+            pair.setSpacing(6)
+            dot = QLabel("●")
+            dot.setStyleSheet(f"color: {color}; font-size: 12px; border: none; padding: 0;")
+            dot.setFixedWidth(14)
             pair.addWidget(dot)
+            pct = int(count / total * 100) if total > 0 else 0
+            text = QLabel(f"{status}  {count} ({pct}%)")
+            text.setStyleSheet(f"color: {self.theme['text']}; font-size: 12px; border: none; padding: 0;")
             pair.addWidget(text)
-            legend_layout.addLayout(pair)
-        legend_layout.addStretch()
-        layout.addLayout(legend_layout)
+            pair.addStretch()
+            legend.addLayout(pair)
+        legend.addStretch()
+        body.addLayout(legend, 1)
+
+        layout.addLayout(body)
         return frame
 
     def _priority_bars(self, by_priority, total):
@@ -2120,7 +2133,7 @@ class DashboardPage(QWidget):
         t = self.theme
         for prio in ["Critical", "High", "Medium", "Low"]:
             count = by_priority.get(prio, 0)
-            pct = (count / total * 100) if total > 0 else 0
+            pct = int(count / total * 100) if total > 0 else 0
             color = PRIORITY_COLORS.get(prio, "#999")
 
             row = QHBoxLayout()
@@ -2130,22 +2143,21 @@ class DashboardPage(QWidget):
             name.setStyleSheet(f"color: {t['text']}; font-size: 12px; font-weight: 600; border: none; padding: 0;")
             row.addWidget(name)
 
-            bar_bg = QFrame()
-            bar_bg.setFixedHeight(22)
-            bar_bg.setStyleSheet(f"background-color: {t['section_bg']}; border-radius: 6px; border: none;")
-            bar_layout = QHBoxLayout(bar_bg)
-            bar_layout.setContentsMargins(0, 0, 0, 0)
-            bar_layout.setSpacing(0)
-
-            bar_fill = QFrame()
-            bar_fill.setFixedHeight(22)
-            fill_width = max(int(pct * 2.5), 0)
-            bar_fill.setFixedWidth(fill_width)
-            bar_fill.setStyleSheet(f"background-color: {color}; border-radius: 6px; border: none;")
-            bar_layout.addWidget(bar_fill)
-            bar_layout.addStretch()
-
-            row.addWidget(bar_bg, 1)
+            bar = QProgressBar()
+            bar.setValue(pct)
+            bar.setTextVisible(False)
+            bar.setFixedHeight(20)
+            bar.setStyleSheet(f"""
+                QProgressBar {{
+                    background-color: {t['section_bg']};
+                    border-radius: 6px; border: none;
+                }}
+                QProgressBar::chunk {{
+                    background-color: {color};
+                    border-radius: 6px;
+                }}
+            """)
+            row.addWidget(bar, 1)
 
             cnt_lbl = QLabel(f"{count}")
             cnt_lbl.setFixedWidth(30)

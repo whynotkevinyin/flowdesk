@@ -1,12 +1,26 @@
 // ============================================================
-// Code.gs — Flowdesk Backend API (v3 - with Events & Notes)
+// Code.gs — Flowdesk Backend API (v4 - with Security)
 // ============================================================
 
+// ⚠️ CHANGE THESE to your own secrets!
+const API_KEY = 'gBjEq2sv1LBnFPDs-eqg2wDrcp3BBMpjQGa5ZWUmw_E';  // Long key (for desktop app)
+const PIN = 'flow';  // ← Short password for phone/tablet login (change this!)
+
+function checkAuth(e) {
+  const key = (e && e.parameter && e.parameter.key) || '';
+  return key === API_KEY || key === PIN;
+}
+
 function doGet(e) {
+  // Ping is open (for connectivity check only, returns no data)
   const action = (e && e.parameter && e.parameter.action) || '';
+  if (action === 'ping') return json({ ok: true, version: 4 });
+
+  // All other actions require API key
+  if (!checkAuth(e)) return json({ error: 'Unauthorized', code: 401 });
+
   if (action === 'init') return json(initSheet());
   if (action === 'getTasks') return json(getAllData());
-  if (action === 'ping') return json({ ok: true, version: 3 });
   if (action === 'syncAll') {
     try {
       const data = JSON.parse(e.parameter.data);
@@ -20,7 +34,13 @@ function doGet(e) {
 
 function doPost(e) {
   try {
+    // Check key from query param or body
+    const paramKey = (e && e.parameter && e.parameter.key) || '';
     const body = JSON.parse(e.postData.contents);
+    const bodyKey = body.key || '';
+    if (paramKey !== API_KEY && paramKey !== PIN && bodyKey !== API_KEY && bodyKey !== PIN) {
+      return json({ error: 'Unauthorized', code: 401 });
+    }
     const action = body.action;
     if (action === 'syncAll') return json(syncAll(body));
     return json({ error: 'Unknown action' });
@@ -83,10 +103,10 @@ function initSheet() {
   let notesSheet = ss.getSheetByName('Notes');
   if (!notesSheet) {
     notesSheet = ss.insertSheet('Notes');
-    notesSheet.appendRow(['id','title','content','pinned','createdAt','updatedAt']);
-    notesSheet.getRange(1,1,1,6).setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
+    notesSheet.appendRow(['id','title','content','pinned','folder','sortOrder','createdAt','updatedAt']);
+    notesSheet.getRange(1,1,1,8).setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
     notesSheet.setFrozenRows(1);
-    notesSheet.setColumnWidths(1,6,180);
+    notesSheet.setColumnWidths(1,8,140);
   }
 
   const sheet1 = ss.getSheetByName('Sheet1');
@@ -149,9 +169,9 @@ function getAllData() {
   const notesSheet = ss.getSheetByName('Notes');
   const notes = [];
   if (notesSheet && notesSheet.getLastRow() > 1) {
-    const nData = notesSheet.getRange(2,1,notesSheet.getLastRow()-1,6).getValues();
+    const nData = notesSheet.getRange(2,1,notesSheet.getLastRow()-1,8).getValues();
     nData.forEach(r => {
-      if(r[0]) notes.push({id:String(r[0]), title:r[1], content:r[2], pinned:r[3]?true:false});
+      if(r[0]) notes.push({id:String(r[0]), title:r[1], content:r[2], pinned:r[3]?true:false, folder:r[4]||'', sortOrder:r[5]||0});
     });
   }
 
@@ -214,10 +234,10 @@ function syncAll(fullData) {
   // Notes
   const ns = ss.getSheetByName('Notes');
   if (ns && fullData.notes) {
-    if (ns.getLastRow() > 1) ns.getRange(2,1,ns.getLastRow()-1,6).clearContent();
+    if (ns.getLastRow() > 1) ns.getRange(2,1,ns.getLastRow()-1,8).clearContent();
     (fullData.notes || []).forEach((n,i) => {
-      ns.getRange(i+2,1,1,6).setValues([[
-        n.id, n.title||'', n.content||'', n.pinned?1:0, n.createdAt||now, now
+      ns.getRange(i+2,1,1,8).setValues([[
+        n.id, n.title||'', n.content||'', n.pinned?1:0, n.folder||'', n.sortOrder||0, n.createdAt||now, now
       ]]);
     });
   }

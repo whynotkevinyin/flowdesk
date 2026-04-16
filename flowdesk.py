@@ -345,6 +345,8 @@ class Database:
                 content     TEXT    DEFAULT '',
                 color       TEXT    NOT NULL DEFAULT '#0073ea',
                 pinned      INTEGER NOT NULL DEFAULT 0,
+                folder      TEXT    NOT NULL DEFAULT '',
+                sort_order  INTEGER NOT NULL DEFAULT 0,
                 created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
                 updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
             );
@@ -366,6 +368,16 @@ class Database:
                 deleted_at  TEXT    NOT NULL DEFAULT (datetime('now'))
             );
         """)
+        self.conn.commit()
+        self._migrate()
+
+    def _migrate(self):
+        """Add columns that may not exist in older databases."""
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(notes)").fetchall()}
+        if "folder" not in cols:
+            self.conn.execute("ALTER TABLE notes ADD COLUMN folder TEXT NOT NULL DEFAULT ''")
+        if "sort_order" not in cols:
+            self.conn.execute("ALTER TABLE notes ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
         self.conn.commit()
 
     # ── Groups ──
@@ -554,13 +566,27 @@ class Database:
     # ── Notes ──
     def get_notes(self):
         return self.conn.execute(
-            "SELECT * FROM notes ORDER BY pinned DESC, updated_at DESC"
+            "SELECT * FROM notes ORDER BY pinned DESC, folder, sort_order, updated_at DESC"
         ).fetchall()
 
-    def add_note(self, title="Untitled", content="", color="#0073ea"):
+    def get_note_folders(self):
+        """Return distinct folder names (excluding empty = unfiled)."""
+        rows = self.conn.execute(
+            "SELECT DISTINCT folder FROM notes WHERE folder != '' ORDER BY folder"
+        ).fetchall()
+        return [r["folder"] for r in rows]
+
+    def reorder_notes(self, note_ids):
+        """Set sort_order based on position in the given id list."""
+        for i, nid in enumerate(note_ids):
+            self.conn.execute("UPDATE notes SET sort_order=? WHERE id=?", (i, nid))
+        self.conn.commit()
+
+    def add_note(self, title="Untitled", content="", color="#0073ea", folder=""):
+        max_order = self.conn.execute("SELECT COALESCE(MAX(sort_order),0) FROM notes").fetchone()[0]
         cur = self.conn.execute(
-            "INSERT INTO notes(title, content, color) VALUES (?, ?, ?)",
-            (title, content, color)
+            "INSERT INTO notes(title, content, color, folder, sort_order) VALUES (?, ?, ?, ?, ?)",
+            (title, content, color, folder, max_order + 1)
         )
         self.conn.commit()
         return cur.lastrowid
@@ -697,6 +723,7 @@ class SyncManager:
         self.db = db
         self.db_path = db.conn.execute("PRAGMA database_list").fetchone()[2]
         self.sync_url = ""
+        self.api_key = ""
         self.status = self.STATUS_NO_URL
         self.last_error = ""
         self.status_callback = status_callback
@@ -711,21 +738,23 @@ class SyncManager:
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
                 self.sync_url = cfg.get("sync_url", "")
+                self.api_key = cfg.get("api_key", "")
                 if self.sync_url:
                     self.status = self.STATUS_IDLE
             except Exception:
                 pass
 
     def save_config(self):
-        cfg = {"sync_url": self.sync_url}
+        cfg = {"sync_url": self.sync_url, "api_key": self.api_key}
         try:
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(cfg, f, indent=2)
         except Exception:
             pass
 
-    def set_url(self, url):
+    def set_url(self, url, api_key=""):
         self.sync_url = url.strip()
+        self.api_key = api_key.strip()
         self.save_config()
         self.status = self.STATUS_IDLE if self.sync_url else self.STATUS_NO_URL
         self._notify()
@@ -742,7 +771,8 @@ class SyncManager:
 
     def _http_post_as_get(self, url, data_str):
         encoded = urllib.parse.quote(data_str)
-        full_url = f"{url}?action=syncAll&data={encoded}"
+        key_param = f"&key={urllib.parse.quote(self.api_key)}" if self.api_key else ""
+        full_url = f"{url}?action=syncAll&data={encoded}{key_param}"
         req = urllib.request.Request(full_url, method="GET")
         req.add_header("User-Agent", "Flowdesk/1.0")
         with urllib.request.urlopen(req, timeout=60) as resp:
@@ -757,8 +787,11 @@ class SyncManager:
         self._notify()
         try:
             db = self._thread_db()
-            url = f"{self.sync_url}?action=getTasks"
+            key_param = f"&key={urllib.parse.quote(self.api_key)}" if self.api_key else ""
+            url = f"{self.sync_url}?action=getTasks{key_param}"
             remote = self._http_get(url)
+            if remote.get("code") == 401:
+                raise Exception("Unauthorized — check your API Key")
             remote_groups = remote.get("groups", [])
 
             # Build set of remote group names and their task names
@@ -872,15 +905,17 @@ class SyncManager:
                 for rn in remote_notes:
                     t = rn.get("title", "")
                     remote_note_titles.add(t)
+                    folder = rn.get("folder", "")
+                    sort_order = rn.get("sortOrder", rn.get("sort_order", 0))
                     if t in local_note_titles:
                         ln = local_note_titles[t]
                         db.update_note(ln["id"],
                             content=rn.get("content", ""),
-                            pinned=1 if rn.get("pinned") else 0)
+                            pinned=1 if rn.get("pinned") else 0,
+                            folder=folder, sort_order=sort_order)
                     else:
-                        nid = db.add_note(t, rn.get("content", ""))
-                        if rn.get("pinned"):
-                            db.update_note(nid, pinned=1)
+                        nid = db.add_note(t, rn.get("content", ""), folder=folder)
+                        db.update_note(nid, pinned=1 if rn.get("pinned") else 0, sort_order=sort_order)
                 # Remove local notes not in remote
                 for n_title, n_data in local_note_titles.items():
                     if n_title not in remote_note_titles:
@@ -939,9 +974,12 @@ class SyncManager:
             # Notes
             push_data["notes"] = []
             for n in db.get_notes():
+                nd = dict(n)
                 push_data["notes"].append({
-                    "id": str(n["id"]), "title": n["title"],
-                    "content": n["content"], "pinned": bool(n["pinned"]),
+                    "id": str(nd["id"]), "title": nd["title"],
+                    "content": nd["content"], "pinned": bool(nd["pinned"]),
+                    "folder": nd.get("folder", ""),
+                    "sortOrder": nd.get("sort_order", 0),
                 })
 
             data_str = json.dumps(push_data, ensure_ascii=False)
@@ -1895,11 +1933,13 @@ class NotesPage(QWidget):
         self.db = db
         self.theme = theme
         self.current_note_id = None
+        self.current_folder = None  # None = show all, "" = unfiled, "X" = folder X
         self._build()
 
     def set_theme(self, theme):
         self.theme = theme
         self.editor.set_theme(theme)
+        self._refresh_folders()
         self._refresh_list()
 
     def _build(self):
@@ -1913,19 +1953,28 @@ class NotesPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Left panel - note list
+        # Left panel - folder + note list
         left = QWidget()
-        left.setFixedWidth(260)
+        left.setFixedWidth(280)
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(8, 8, 8, 8)
         left_layout.setSpacing(6)
 
-        # Header
+        # Header row
         header = QHBoxLayout()
         title = QLabel("Notes")
         title.setFont(QFont("Inter", 14, QFont.Weight.Bold))
         header.addWidget(title)
         header.addStretch()
+
+        # New folder button
+        new_folder_btn = QPushButton("\U0001F4C1")
+        new_folder_btn.setFixedSize(28, 28)
+        new_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        new_folder_btn.setToolTip("New Folder")
+        new_folder_btn.setStyleSheet("QPushButton { border: none; font-size: 14px; background: transparent; } QPushButton:hover { background: rgba(0,0,0,0.06); border-radius: 6px; }")
+        new_folder_btn.clicked.connect(self._new_folder)
+        header.addWidget(new_folder_btn)
 
         add_btn = QPushButton("+")
         add_btn.setFixedSize(28, 28)
@@ -1935,6 +1984,20 @@ class NotesPage(QWidget):
         header.addWidget(add_btn)
         left_layout.addLayout(header)
 
+        # Folder bar
+        self.folder_scroll = QScrollArea()
+        self.folder_scroll.setWidgetResizable(True)
+        self.folder_scroll.setFixedHeight(34)
+        self.folder_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.folder_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.folder_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; } QScrollArea > QWidget > QWidget { background: transparent; }")
+        self.folder_container = QWidget()
+        self.folder_bar = QHBoxLayout(self.folder_container)
+        self.folder_bar.setContentsMargins(0, 0, 0, 0)
+        self.folder_bar.setSpacing(4)
+        self.folder_scroll.setWidget(self.folder_container)
+        left_layout.addWidget(self.folder_scroll)
+
         # Search
         self.search = QLineEdit()
         self.search.setPlaceholderText("Search notes...")
@@ -1942,9 +2005,12 @@ class NotesPage(QWidget):
         self.search.textChanged.connect(self._refresh_list)
         left_layout.addWidget(self.search)
 
-        # Note list
+        # Note list (drag-drop enabled)
         self.note_list = QListWidget()
+        self.note_list.setDragDropMode(QListWidget.DragDropMode.InternalMove)
+        self.note_list.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.note_list.currentRowChanged.connect(self._on_note_selected)
+        self.note_list.model().rowsMoved.connect(self._on_rows_moved)
         left_layout.addWidget(self.note_list)
 
         layout.addWidget(left)
@@ -1961,7 +2027,7 @@ class NotesPage(QWidget):
         right_layout.setContentsMargins(12, 8, 12, 8)
         right_layout.setSpacing(6)
 
-        # Note title
+        # Note title + folder selector row
         title_row = QHBoxLayout()
         self.note_title = QLineEdit()
         self.note_title.setPlaceholderText("Note title...")
@@ -1969,6 +2035,15 @@ class NotesPage(QWidget):
         self.note_title.setStyleSheet("border: none; background: transparent; padding: 4px;")
         self.note_title.textChanged.connect(self._save_current)
         title_row.addWidget(self.note_title)
+
+        # Folder combo for current note
+        self.folder_combo = QComboBox()
+        self.folder_combo.setFixedWidth(130)
+        self.folder_combo.setFixedHeight(26)
+        self.folder_combo.setStyleSheet("QComboBox { font-size: 11px; padding: 2px 6px; border-radius: 4px; }")
+        self.folder_combo.setToolTip("Move to folder")
+        self.folder_combo.currentTextChanged.connect(self._on_folder_changed_for_note)
+        title_row.addWidget(self.folder_combo)
 
         self.pin_btn = QPushButton("\u2606")
         self.pin_btn.setFixedSize(28, 28)
@@ -2020,14 +2095,153 @@ class NotesPage(QWidget):
 
         layout.addWidget(right)
 
+        self._refresh_folders()
         self._refresh_list()
         self._set_editor_enabled(False)
+
+    # ── Folder management ──
+    def _refresh_folders(self):
+        """Rebuild the folder button bar."""
+        while self.folder_bar.count():
+            item = self.folder_bar.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        folders = self.db.get_note_folders()
+        t = self.theme
+
+        def make_btn(label, folder_val, icon=""):
+            active = self.current_folder == folder_val
+            btn = QPushButton(f"{icon} {label}".strip())
+            btn.setFixedHeight(26)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            bg = t.get("accent", "#0073ea") if active else "transparent"
+            fg = "white" if active else t.get("text", "#3d3a33")
+            border = "none" if active else f"1px solid {t.get('border', '#e8e0c8')}"
+            btn.setStyleSheet(f"QPushButton {{ background: {bg}; color: {fg}; border: {border}; border-radius: 13px; padding: 2px 10px; font-size: 11px; font-weight: 600; }} QPushButton:hover {{ background: {t.get('accent', '#0073ea')}; color: white; }}")
+            btn.clicked.connect(lambda: self._select_folder(folder_val))
+            return btn
+
+        self.folder_bar.addWidget(make_btn("All", None, ""))
+        for f in folders:
+            btn = make_btn(f, f, "\U0001F4C1")
+            # Right-click to rename/delete folder
+            btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            btn.customContextMenuRequested.connect(lambda pos, fn=f, b=btn: self._folder_context_menu(fn, b, pos))
+            self.folder_bar.addWidget(btn)
+        self.folder_bar.addStretch()
+
+        # Update folder combo in editor
+        self._refresh_folder_combo()
+
+    def _refresh_folder_combo(self):
+        """Update the folder dropdown in the editor."""
+        self.folder_combo.blockSignals(True)
+        self.folder_combo.clear()
+        self.folder_combo.addItem("(No Folder)")
+        for f in self.db.get_note_folders():
+            self.folder_combo.addItem(f"\U0001F4C1 {f}")
+        self.folder_combo.addItem("+ New Folder...")
+        self.folder_combo.blockSignals(False)
+
+    def _select_folder(self, folder_val):
+        self.current_folder = folder_val
+        self._refresh_folders()
+        self._refresh_list()
+
+    def _new_folder(self):
+        name, ok = QInputDialog.getText(self, "New Folder", "Folder name:")
+        if ok and name.strip():
+            # Just select it — it will be created when a note is assigned to it
+            self.current_folder = name.strip()
+            self._refresh_folders()
+            self._refresh_list()
+
+    def _folder_context_menu(self, folder_name, btn, pos):
+        from PyQt6.QtWidgets import QMenu
+        menu = QMenu(self)
+        rename_act = menu.addAction("Rename Folder")
+        delete_act = menu.addAction("Delete Folder")
+        action = menu.exec(btn.mapToGlobal(pos))
+        if action == rename_act:
+            new_name, ok = QInputDialog.getText(self, "Rename Folder", "New name:", text=folder_name)
+            if ok and new_name.strip() and new_name.strip() != folder_name:
+                self.db.conn.execute("UPDATE notes SET folder=? WHERE folder=?", (new_name.strip(), folder_name))
+                self.db.conn.commit()
+                if self.current_folder == folder_name:
+                    self.current_folder = new_name.strip()
+                self._refresh_folders()
+                self._refresh_list()
+        elif action == delete_act:
+            reply = QMessageBox.question(self, "Delete Folder",
+                f"Move all notes in '{folder_name}' to unfiled?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
+                self.db.conn.execute("UPDATE notes SET folder='' WHERE folder=?", (folder_name,))
+                self.db.conn.commit()
+                if self.current_folder == folder_name:
+                    self.current_folder = None
+                self._refresh_folders()
+                self._refresh_list()
+
+    def _on_folder_changed_for_note(self, text):
+        """When user changes folder via the combo box in the editor."""
+        if not self.current_note_id:
+            return
+        if text == "+ New Folder...":
+            name, ok = QInputDialog.getText(self, "New Folder", "Folder name:")
+            if ok and name.strip():
+                self.db.update_note(self.current_note_id, folder=name.strip())
+                self._refresh_folders()
+                self._refresh_list()
+            else:
+                # Reset combo to current value
+                self._sync_folder_combo()
+            return
+        folder_val = "" if text == "(No Folder)" else text.replace("\U0001F4C1 ", "")
+        self.db.update_note(self.current_note_id, folder=folder_val)
+        self._refresh_folders()
+        self._refresh_list()
+
+    def _sync_folder_combo(self):
+        """Set the folder combo to match the current note's folder."""
+        if not self.current_note_id:
+            return
+        note = self.db.conn.execute("SELECT folder FROM notes WHERE id=?", (self.current_note_id,)).fetchone()
+        if not note:
+            return
+        folder = note["folder"]
+        self.folder_combo.blockSignals(True)
+        if folder:
+            target = f"\U0001F4C1 {folder}"
+            idx = self.folder_combo.findText(target)
+            if idx >= 0:
+                self.folder_combo.setCurrentIndex(idx)
+        else:
+            self.folder_combo.setCurrentIndex(0)
+        self.folder_combo.blockSignals(False)
+
+    # ── Drag reorder ──
+    def _on_rows_moved(self, *args):
+        """After drag-drop reorder, persist the new order to DB."""
+        new_order = []
+        for i in range(self.note_list.count()):
+            item = self.note_list.item(i)
+            nid = item.data(Qt.ItemDataRole.UserRole)
+            if nid is not None:
+                new_order.append(nid)
+        if new_order:
+            self.db.reorder_notes(new_order)
+            # Update cache to match new order
+            id_to_note = {n["id"]: n for n in self._notes_cache}
+            self._notes_cache = [id_to_note[nid] for nid in new_order if nid in id_to_note]
 
     def _set_editor_enabled(self, enabled):
         self.note_title.setEnabled(enabled)
         self.editor.editor.setEnabled(enabled)
         self.pin_btn.setEnabled(enabled)
         self.del_btn.setEnabled(enabled)
+        self.folder_combo.setEnabled(enabled)
         self.linked_tasks_widget.setVisible(enabled)
         if not enabled:
             self.note_title.clear()
@@ -2042,18 +2256,24 @@ class NotesPage(QWidget):
         self._notes_cache = []
         for n in notes:
             n = dict(n)
+            # Filter by folder
+            if self.current_folder is not None:
+                if n.get("folder", "") != self.current_folder:
+                    continue
+            # Filter by search
             if search and search not in n["title"].lower() and search not in n.get("content", "").lower():
                 continue
             self._notes_cache.append(n)
             pin = "\u2605 " if n["pinned"] else ""
-            item = QListWidgetItem(f"{pin}{n['title']}")
+            folder_tag = f"[{n['folder']}] " if n.get("folder") and self.current_folder is None else ""
+            item = QListWidgetItem(f"{pin}{folder_tag}{n['title']}")
             updated = n["updated_at"][:16] if n.get("updated_at") else ""
-            item.setToolTip(f"Updated: {updated}")
+            item.setToolTip(f"Folder: {n.get('folder') or '(none)'}  |  Updated: {updated}")
             item.setData(Qt.ItemDataRole.UserRole, n["id"])
             self.note_list.addItem(item)
         self.note_list.blockSignals(False)
 
-        # Re-select current note (after unblocking so signal fires)
+        # Re-select current note
         if self.current_note_id:
             for i in range(self.note_list.count()):
                 if self.note_list.item(i).data(Qt.ItemDataRole.UserRole) == self.current_note_id:
@@ -2081,6 +2301,7 @@ class NotesPage(QWidget):
         self.pin_btn.setText("\u2605" if note["pinned"] else "\u2606")
         self.meta_label.setText(f"Created: {note['created_at'][:16]}  |  Updated: {note['updated_at'][:16]}")
 
+        self._sync_folder_combo()
         self._refresh_linked_tasks()
 
     def _refresh_linked_tasks(self):
@@ -2124,13 +2345,13 @@ class NotesPage(QWidget):
         for i in range(self.note_list.count()):
             item = self.note_list.item(i)
             if item and item.data(Qt.ItemDataRole.UserRole) == self.current_note_id:
-                # Check pin status
-                note = self.db.conn.execute("SELECT pinned FROM notes WHERE id=?", (self.current_note_id,)).fetchone()
+                note = self.db.conn.execute("SELECT pinned, folder FROM notes WHERE id=?", (self.current_note_id,)).fetchone()
                 pin = "\u2605 " if note and note["pinned"] else ""
-                item.setText(f"{pin}{title}")
+                folder_tag = f"[{note['folder']}] " if note and note["folder"] and self.current_folder is None else ""
+                item.setText(f"{pin}{folder_tag}{title}")
                 break
 
-        # Also update the cache so _on_note_selected won't overwrite
+        # Also update the cache
         for i, n in enumerate(self._notes_cache):
             if n["id"] == self.current_note_id:
                 self._notes_cache[i]["title"] = title
@@ -2138,10 +2359,11 @@ class NotesPage(QWidget):
                 break
 
     def _new_note(self):
-        nid = self.db.add_note("Untitled", "", EVENT_COLORS[len(self.db.get_notes()) % len(EVENT_COLORS)])
+        folder = self.current_folder if self.current_folder is not None else ""
+        nid = self.db.add_note("Untitled", "", EVENT_COLORS[len(self.db.get_notes()) % len(EVENT_COLORS)], folder=folder)
         self.current_note_id = nid
+        self._refresh_folders()
         self._refresh_list()
-        # Select the new note and force editor activation
         target_row = -1
         for i in range(self.note_list.count()):
             if self.note_list.item(i).data(Qt.ItemDataRole.UserRole) == nid:
@@ -2149,7 +2371,7 @@ class NotesPage(QWidget):
                 break
         if target_row >= 0:
             self.note_list.setCurrentRow(target_row)
-            self._on_note_selected(target_row)  # Force call since signal may not fire
+            self._on_note_selected(target_row)
         self.note_title.setFocus()
         self.note_title.selectAll()
 
@@ -2171,6 +2393,7 @@ class NotesPage(QWidget):
             self.db.delete_note(self.current_note_id)
             self.current_note_id = None
             self._set_editor_enabled(False)
+            self._refresh_folders()
             self._refresh_list()
 
     def _link_task(self):
@@ -3198,9 +3421,18 @@ class FlowdeskApp(QMainWindow):
             text=current
         )
         if ok:
-            self.sync_manager.set_url(url)
+            current_key = self.sync_manager.api_key
+            api_key, ok2 = QInputDialog.getText(
+                self, "API Key",
+                "Enter API Key (from Code.gs):\n(Leave empty to skip authentication)",
+                text=current_key
+            )
+            if ok2:
+                self.sync_manager.set_url(url, api_key)
+            else:
+                self.sync_manager.set_url(url)
             if url.strip():
-                self.statusBar().showMessage("Sync URL saved", 3000)
+                self.statusBar().showMessage("Sync URL & API Key saved", 3000)
             else:
                 self.statusBar().showMessage("Sync URL cleared", 3000)
 

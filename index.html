@@ -1611,18 +1611,28 @@
 
         /* Notes */
         .notes-container { display: flex; height: calc(100vh - 200px); }
-        .notes-sidebar { width: 260px; border-right: 1px solid #e8e0c8; display: flex; flex-direction: column; }
-        .notes-sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 12px; }
+        .notes-sidebar { width: 280px; border-right: 1px solid #e8e0c8; display: flex; flex-direction: column; }
+        .notes-sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 12px; gap: 6px; }
         .notes-sidebar-header h3 { font-size: 15px; font-weight: 700; }
+        .notes-folder-bar { display: flex; gap: 4px; padding: 0 12px 8px; overflow-x: auto; flex-shrink: 0; }
+        .notes-folder-bar::-webkit-scrollbar { height: 0; }
+        .folder-chip { padding: 3px 10px; border-radius: 13px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; border: 1px solid #e8e0c8; background: transparent; transition: all 0.15s; }
+        .folder-chip:hover, .folder-chip.active { background: #0073ea; color: white; border-color: #0073ea; }
         .notes-search { margin: 0 12px 8px; padding: 6px 10px; border: 1px solid #e8e0c8; border-radius: 6px; font-size: 12px; }
         .notes-list { flex: 1; overflow-y: auto; }
-        .note-item { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #e8e0c8; transition: background 0.15s; }
+        .note-item { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #e8e0c8; transition: background 0.15s; position: relative; }
         .note-item:hover { background: rgba(0,115,234,0.06); }
         .note-item.active { background: rgba(0,115,234,0.12); }
+        .note-item.drag-over { border-top: 2px solid #0073ea; }
         .note-item-title { font-size: 13px; font-weight: 600; }
+        .note-item-folder { font-size: 9px; color: #0073ea; margin-top: 1px; }
         .note-item-date { font-size: 10px; color: #999; margin-top: 2px; }
+        .note-item-handle { position: absolute; left: 2px; top: 50%; transform: translateY(-50%); cursor: grab; color: #ccc; font-size: 10px; opacity: 0; transition: opacity 0.15s; user-select: none; }
+        .note-item:hover .note-item-handle { opacity: 1; }
         .note-editor { flex: 1; display: flex; flex-direction: column; padding: 16px; }
-        .note-title-input { font-size: 20px; font-weight: 700; border: none; background: transparent; outline: none; margin-bottom: 8px; width: 100%; }
+        .note-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .note-title-input { font-size: 20px; font-weight: 700; border: none; background: transparent; outline: none; flex: 1; }
+        .note-folder-select { padding: 3px 8px; border: 1px solid #e8e0c8; border-radius: 6px; font-size: 11px; background: transparent; cursor: pointer; }
         .note-toolbar { display: flex; gap: 2px; margin-bottom: 8px; padding: 4px 0; border-bottom: 1px solid #e8e0c8; }
         .note-toolbar button { padding: 4px 10px; border: none; background: transparent; cursor: pointer; border-radius: 4px; font-size: 12px; }
         .note-toolbar button:hover { background: rgba(0,0,0,0.06); }
@@ -1632,14 +1642,86 @@
 
         body.dark .notes-sidebar { border-color: #4a4a58; }
         body.dark .notes-search { background: #3d3d46; border-color: #4a4a58; color: #e8e8ec; }
+        body.dark .folder-chip { border-color: #4a4a58; color: #e8e8ec; }
         body.dark .note-item { border-color: #4a4a58; }
         body.dark .note-title-input { color: #e8e8ec; }
+        body.dark .note-folder-select { border-color: #4a4a58; color: #e8e8ec; background: #3d3d46; }
         body.dark .note-toolbar { border-color: #4a4a58; }
         body.dark .note-toolbar button { color: #e8e8ec; }
         body.dark .note-content { background: #323240; border-color: #4a4a58; color: #e8e8ec; }
+
+        /* Notes tablet responsive */
+        @media (max-width: 768px) {
+            .notes-container { flex-direction: column; height: auto; }
+            .notes-sidebar { width: 100%; border-right: none; border-bottom: 1px solid #e8e0c8; max-height: 40vh; }
+            .note-editor { min-height: 50vh; }
+        }
+
+        /* Login Screen */
+        .login-screen {
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; background: linear-gradient(135deg, #292f4c 0%, #1a1f35 100%);
+        }
+        .login-box {
+            background: white; border-radius: 16px; padding: 40px;
+            width: 380px; max-width: 90vw; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .login-logo { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+        .login-logo .flow { color: #fdab3d; }
+        .login-logo .desk { color: #292f4c; }
+        .login-subtitle { color: #999; font-size: 13px; margin-bottom: 28px; }
+        .login-input {
+            width: 100%; padding: 12px 16px; border: 1px solid #e0e0e0; border-radius: 8px;
+            font-size: 14px; font-family: 'Inter', sans-serif; margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
+        .login-input:focus { outline: none; border-color: #0073ea; }
+        .login-input.error { border-color: #e2445c; }
+        .login-btn {
+            width: 100%; padding: 12px; background: #0073ea; color: white; border: none;
+            border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+            font-family: 'Inter', sans-serif; transition: background 0.2s;
+        }
+        .login-btn:hover { background: #0066d9; }
+        .login-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .login-error { color: #e2445c; font-size: 12px; margin-top: 8px; display: none; }
+        .login-remember { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #666; margin: 8px 0 16px; justify-content: flex-start; }
+        .login-remember input { width: 14px; height: 14px; }
+        .login-logout { position: fixed; bottom: 16px; right: 16px; z-index: 9999; }
+        .login-logout button {
+            padding: 6px 14px; background: rgba(0,0,0,0.06); border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 6px; font-size: 11px; cursor: pointer; color: #666; font-family: 'Inter', sans-serif;
+        }
+        .login-logout button:hover { background: rgba(226,68,92,0.1); color: #e2445c; border-color: #e2445c; }
+        body.dark .login-logout button { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); color: #aaa; }
+        body.dark .login-logout button:hover { background: rgba(226,68,92,0.15); color: #e2445c; }
     </style>
 </head>
 <body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-box">
+            <div class="login-logo">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="11" fill="#292f4c"/>
+                    <path d="M7 12.5l3 3 7-7" stroke="#0073ea" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span class="flow">Flow</span><span class="desk">desk</span>
+            </div>
+            <div class="login-subtitle">Enter your password to access your data</div>
+            <input type="password" id="loginKeyInput" class="login-input" placeholder="Password or API Key" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="current-password">
+            <div class="login-remember">
+                <input type="checkbox" id="loginRemember" checked>
+                <label for="loginRemember">Remember on this device</label>
+            </div>
+            <button class="login-btn" onclick="doLogin()" id="loginBtn">Unlock</button>
+            <div class="login-error" id="loginError">密碼錯誤，請重試。</div>
+        </div>
+    </div>
+
+    <!-- Main App (hidden until authenticated) -->
+    <div id="mainApp" style="display:none;">
     <header>
         <div class="header-left">
             <div class="logo">
@@ -1784,9 +1866,87 @@
     </div>
 
     <div id="popupOverlay" class="popup-overlay hidden" onclick="closeAllPopups()"></div>
+    </div><!-- end mainApp -->
+
+    <!-- Logout button (visible when logged in) -->
+    <div class="login-logout" id="logoutArea" style="display:none;">
+        <button onclick="doLogout()">🔒 Logout</button>
+    </div>
 
     <script>
         const API_URL = 'https://script.google.com/macros/s/AKfycbyIDnK9XnMy0a4ORFi9TxxNV3G62qUff2_JLHrIIdgpj4kASFult-ax_KWL227DhrtKig/exec';
+        let FLOWDESK_API_KEY = '';
+
+        // ── Auth functions ──
+        function getAuthUrl(action) {
+            return API_URL + '?action=' + action + '&key=' + encodeURIComponent(FLOWDESK_API_KEY);
+        }
+
+        async function doLogin() {
+            const input = document.getElementById('loginKeyInput');
+            const btn = document.getElementById('loginBtn');
+            const errEl = document.getElementById('loginError');
+            const key = input.value.trim();
+            if (!key) { input.classList.add('error'); return; }
+
+            btn.disabled = true; btn.textContent = 'Verifying...';
+            errEl.style.display = 'none'; input.classList.remove('error');
+
+            try {
+                // Test the key by calling getTasks
+                const resp = await fetch(API_URL + '?action=getTasks&key=' + encodeURIComponent(key));
+                const data = await resp.json();
+                if (data.error && data.code === 401) {
+                    input.classList.add('error');
+                    errEl.style.display = 'block';
+                    btn.disabled = false; btn.textContent = 'Unlock';
+                    return;
+                }
+                // Success!
+                FLOWDESK_API_KEY = key;
+                if (document.getElementById('loginRemember').checked) {
+                    localStorage.setItem('flowdesk_api_key', key);
+                }
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('mainApp').style.display = '';
+                document.getElementById('logoutArea').style.display = '';
+                // Load remote data
+                if (data.groups) {
+                    appData = {
+                        groups: data.groups.map(g => ({...g, collapsed: false, tasks: (g.tasks||[]).map(t => ({...t, progress: t.progress||0, subtasks: t.subtasks||[]}))})),
+                        members: data.members || []
+                    };
+                    saveLocalData();
+                }
+                initApp();
+            } catch (e) {
+                errEl.textContent = 'Connection error. Check your network.';
+                errEl.style.display = 'block';
+                btn.disabled = false; btn.textContent = 'Unlock';
+            }
+        }
+
+        function doLogout() {
+            FLOWDESK_API_KEY = '';
+            localStorage.removeItem('flowdesk_api_key');
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('logoutArea').style.display = 'none';
+            document.getElementById('loginScreen').style.display = '';
+            document.getElementById('loginKeyInput').value = '';
+            document.getElementById('loginError').style.display = 'none';
+        }
+
+        function tryAutoLogin() {
+            const savedKey = localStorage.getItem('flowdesk_api_key');
+            if (savedKey) {
+                FLOWDESK_API_KEY = savedKey;
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('mainApp').style.display = '';
+                document.getElementById('logoutArea').style.display = '';
+                return true;
+            }
+            return false;
+        }
 
         const STATUS_COLORS = {
             'Working on it': '#e8830c',
@@ -1817,6 +1977,8 @@
         let calendarDate = new Date();
         let calendarMode = 'month';
         let currentNoteId = null;
+        let currentNoteFolder = null; // null=all, ''=unfiled, 'X'=folder X
+        let noteDragSrcIndex = null;
         let currentEditingCell = null;
         let currentEditingGroup = null;
         let currentDraggingTask = null;
@@ -1824,7 +1986,7 @@
         let syncTimeout = null;
         let darkMode = localStorage.getItem('flowdesk_dark') === 'true';
 
-        document.addEventListener('DOMContentLoaded', async () => {
+        function initApp() {
             if (darkMode) {
                 document.body.classList.add('dark');
                 document.getElementById('darkModeBtn').textContent = '☀️';
@@ -1833,12 +1995,18 @@
             const saved = localStorage.getItem('flowdesk_data');
             if (saved) try { appData = JSON.parse(saved); } catch (e) {}
 
-            // Render local data first so user sees their tasks immediately
             setupEventListeners();
             renderApp();
-
-            // Then try to sync in background (won't overwrite if local has more data)
             syncData();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (darkMode) document.body.classList.add('dark');
+            // Try auto-login with saved key
+            if (tryAutoLogin()) {
+                initApp();
+            }
+            // Otherwise show login screen (default)
         });
 
         function setupEventListeners() {
@@ -1874,8 +2042,9 @@
                     await pushSync();
                 }
 
-                const response = await fetch(API_URL + '?action=getTasks');
+                const response = await fetch(getAuthUrl('getTasks'));
                 const data = await response.json();
+                if (data.error && data.code === 401) { doLogout(); return; }
 
                 if (data.groups) {
                     // Normalize tasks — ensure progress defaults to 0
@@ -1913,8 +2082,10 @@
                         title: n.title || 'Untitled',
                         content: n.content || '',
                         pinned: n.pinned || false,
-                        createdAt: n.createdAt || new Date().toISOString(),
-                        updatedAt: n.updatedAt || new Date().toISOString()
+                        folder: n.folder || '',
+                        sort_order: n.sort_order || n.sortOrder || 0,
+                        created_at: n.createdAt || n.created_at || new Date().toISOString(),
+                        updated_at: n.updatedAt || n.updated_at || new Date().toISOString()
                     }));
                     saveNotesData();
                     const view = document.querySelector('.view-tab.active');
@@ -1949,11 +2120,12 @@
                         color: ev.color || '#0073ea', allDay: ev.all_day || false
                     })),
                     notes: notesData.notes.map(n => ({
-                        id: n.id, title: n.title, content: n.content, pinned: n.pinned || false
+                        id: n.id, title: n.title, content: n.content, pinned: n.pinned || false,
+                        folder: n.folder || '', sortOrder: n.sort_order || 0
                     }))
                 };
                 const data = encodeURIComponent(JSON.stringify(pushData));
-                const resp = await fetch(API_URL + '?action=syncAll&data=' + data);
+                const resp = await fetch(getAuthUrl('syncAll') + '&data=' + data);
                 const result = await resp.json();
                 if (result.error) console.error('Push sync error:', result.error);
             } catch (e) { console.error('Push sync failed:', e); }
@@ -3090,30 +3262,69 @@
 
         // ========== NOTES FUNCTIONS ==========
 
+        function getNoteFolders() {
+            const folders = new Set();
+            notesData.notes.forEach(n => { if (n.folder) folders.add(n.folder); });
+            return [...folders].sort();
+        }
+
+        function getFilteredNotes() {
+            return notesData.notes.filter(n => {
+                if (currentNoteFolder !== null && (n.folder || '') !== currentNoteFolder) return false;
+                return true;
+            });
+        }
+
         function renderNotes() {
             const container = document.getElementById('notesView');
+            const filtered = getFilteredNotes();
             const currentNote = notesData.notes.find(n => n.id === currentNoteId);
+            const folders = getNoteFolders();
+
+            // Folder bar
+            let folderBarHtml = `<div class="notes-folder-bar">
+                <span class="folder-chip${currentNoteFolder === null ? ' active' : ''}" onclick="selectNoteFolder(null)">All</span>`;
+            folders.forEach(f => {
+                const active = currentNoteFolder === f ? ' active' : '';
+                folderBarHtml += `<span class="folder-chip${active}" onclick="selectNoteFolder('${f.replace(/'/g, "\\'")}')" oncontextmenu="folderContextMenu(event,'${f.replace(/'/g, "\\'")}')">📁 ${f}</span>`;
+            });
+            folderBarHtml += '</div>';
 
             let sidebarHtml = `<div class="notes-sidebar">
                 <div class="notes-sidebar-header">
                     <h3>Notes</h3>
+                    <button class="btn btn-secondary" style="padding:3px 8px;font-size:11px;" onclick="newNoteFolder()" title="New Folder">📁+</button>
                     <button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="addNote()">+ New</button>
                 </div>
+                ${folderBarHtml}
                 <input type="text" class="notes-search" placeholder="Search notes..." oninput="filterNotes(this.value)" id="notesSearchInput">
                 <div class="notes-list" id="notesList">`;
 
-            notesData.notes.forEach(n => {
+            filtered.forEach((n, idx) => {
                 const active = n.id === currentNoteId ? ' active' : '';
                 const rawDate = n.updated_at || n.updatedAt || n.created_at || n.createdAt || '';
                 const date = rawDate ? new Date(rawDate).toLocaleDateString() : '';
                 const safeId = typeof n.id === 'string' ? `'${n.id}'` : n.id;
-                sidebarHtml += `<div class="note-item${active}" onclick="selectNote(${safeId})">
-                    <div class="note-item-title">${n.pinned ? '&#128204; ' : ''}${n.title || 'Untitled'}</div>
+                const folderTag = n.folder && currentNoteFolder === null ? `<div class="note-item-folder">📁 ${n.folder}</div>` : '';
+                sidebarHtml += `<div class="note-item${active}" onclick="selectNote(${safeId})"
+                    draggable="true" data-note-idx="${idx}"
+                    ondragstart="noteDragStart(event,${idx})" ondragover="noteDragOver(event)" ondragleave="noteDragLeave(event)" ondrop="noteDrop(event,${idx})">
+                    <span class="note-item-handle">⠿</span>
+                    <div class="note-item-title">${n.pinned ? '📌 ' : ''}${n.title || 'Untitled'}</div>
+                    ${folderTag}
                     <div class="note-item-date">${date === 'Invalid Date' ? '' : date}</div>
                 </div>`;
             });
 
             sidebarHtml += '</div></div>';
+
+            // Folder options for editor dropdown
+            let folderOptions = '<option value="">(No Folder)</option>';
+            folders.forEach(f => {
+                const sel = currentNote && currentNote.folder === f ? ' selected' : '';
+                folderOptions += `<option value="${f}"${sel}>📁 ${f}</option>`;
+            });
+            folderOptions += '<option value="__new__">+ New Folder...</option>';
 
             let editorHtml = '';
             if (currentNote) {
@@ -3123,8 +3334,11 @@
                 const createdDisplay = createdStr ? new Date(createdStr).toLocaleString() : '';
                 const updatedDisplay = updatedStr ? new Date(updatedStr).toLocaleString() : '';
                 editorHtml = `<div class="note-editor">
-                    <input class="note-title-input" value="${(currentNote.title || '').replace(/"/g, '&quot;')}"
-                        oninput="updateNoteTitle(${safeId}, this.value)" placeholder="Note title...">
+                    <div class="note-title-row">
+                        <input class="note-title-input" value="${(currentNote.title || '').replace(/"/g, '&quot;')}"
+                            oninput="updateNoteTitle(${safeId}, this.value)" placeholder="Note title...">
+                        <select class="note-folder-select" onchange="moveNoteToFolder(${safeId}, this.value)">${folderOptions}</select>
+                    </div>
                     <div class="note-toolbar">
                         <button onclick="document.execCommand('bold')" title="Bold"><b>B</b></button>
                         <button onclick="document.execCommand('italic')" title="Italic"><i>I</i></button>
@@ -3145,6 +3359,96 @@
             }
 
             container.innerHTML = `<div class="notes-container">${sidebarHtml}${editorHtml}</div>`;
+
+            // Set folder select value after render
+            if (currentNote) {
+                const sel = container.querySelector('.note-folder-select');
+                if (sel) sel.value = currentNote.folder || '';
+            }
+        }
+
+        function selectNoteFolder(folder) {
+            currentNoteFolder = folder;
+            renderNotes();
+        }
+
+        function newNoteFolder() {
+            const name = prompt('Folder name:');
+            if (name && name.trim()) {
+                currentNoteFolder = name.trim();
+                renderNotes();
+            }
+        }
+
+        function folderContextMenu(e, folderName) {
+            e.preventDefault();
+            const action = prompt(`Folder "${folderName}":\nType "rename" to rename or "delete" to delete folder:`);
+            if (!action) return;
+            if (action.toLowerCase().startsWith('rename')) {
+                const newName = prompt('New folder name:', folderName);
+                if (newName && newName.trim() && newName.trim() !== folderName) {
+                    notesData.notes.forEach(n => { if (n.folder === folderName) n.folder = newName.trim(); });
+                    if (currentNoteFolder === folderName) currentNoteFolder = newName.trim();
+                    saveNotesData(); renderNotes();
+                }
+            } else if (action.toLowerCase().startsWith('delete')) {
+                if (confirm(`Move all notes in "${folderName}" to unfiled?`)) {
+                    notesData.notes.forEach(n => { if (n.folder === folderName) n.folder = ''; });
+                    if (currentNoteFolder === folderName) currentNoteFolder = null;
+                    saveNotesData(); renderNotes();
+                }
+            }
+        }
+
+        function moveNoteToFolder(noteId, folder) {
+            if (folder === '__new__') {
+                const name = prompt('New folder name:');
+                if (name && name.trim()) {
+                    const note = notesData.notes.find(n => n.id === noteId);
+                    if (note) { note.folder = name.trim(); note.updated_at = new Date().toISOString(); }
+                } else {
+                    renderNotes(); return;
+                }
+            } else {
+                const note = notesData.notes.find(n => n.id === noteId);
+                if (note) { note.folder = folder; note.updated_at = new Date().toISOString(); }
+            }
+            saveNotesData(); renderNotes();
+        }
+
+        // Drag & drop reorder
+        function noteDragStart(e, idx) {
+            noteDragSrcIndex = idx;
+            e.dataTransfer.effectAllowed = 'move';
+            e.target.style.opacity = '0.5';
+        }
+        function noteDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            e.currentTarget.classList.add('drag-over');
+        }
+        function noteDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+        function noteDrop(e, targetIdx) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            if (noteDragSrcIndex === null || noteDragSrcIndex === targetIdx) return;
+            const filtered = getFilteredNotes();
+            const srcNote = filtered[noteDragSrcIndex];
+            const targetNote = filtered[targetIdx];
+            if (!srcNote || !targetNote) return;
+            // Find in main array and reorder
+            const srcMainIdx = notesData.notes.findIndex(n => n.id === srcNote.id);
+            const targetMainIdx = notesData.notes.findIndex(n => n.id === targetNote.id);
+            if (srcMainIdx < 0 || targetMainIdx < 0) return;
+            notesData.notes.splice(srcMainIdx, 1);
+            const newTargetIdx = notesData.notes.findIndex(n => n.id === targetNote.id);
+            notesData.notes.splice(newTargetIdx >= 0 ? newTargetIdx : targetMainIdx, 0, srcNote);
+            // Update sort_order
+            notesData.notes.forEach((n, i) => n.sort_order = i);
+            noteDragSrcIndex = null;
+            saveNotesData(); renderNotes();
         }
 
         function addNote() {
@@ -3153,10 +3457,13 @@
                 title: 'Untitled',
                 content: '',
                 pinned: false,
+                folder: currentNoteFolder || '',
+                sort_order: 0,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             };
             notesData.notes.unshift(note);
+            notesData.notes.forEach((n, i) => n.sort_order = i);
             currentNoteId = note.id;
             saveNotesData();
             renderNotes();
@@ -3185,11 +3492,10 @@
             note.title = title;
             note.updated_at = new Date().toISOString();
             saveNotesData();
-            // Update sidebar title without full re-render
             const items = document.querySelectorAll('.note-item');
             items.forEach(item => {
                 if (item.classList.contains('active')) {
-                    item.querySelector('.note-item-title').textContent = (note.pinned ? '\u{1F4CC} ' : '') + (title || 'Untitled');
+                    item.querySelector('.note-item-title').textContent = (note.pinned ? '📌 ' : '') + (title || 'Untitled');
                 }
             });
         }

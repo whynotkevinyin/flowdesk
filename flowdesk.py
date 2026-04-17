@@ -638,7 +638,10 @@ class Database:
         return cur.lastrowid
 
     def update_note(self, nid, **kwargs):
-        kwargs["updated_at"] = datetime.now().isoformat()
+        # Store as UTC with space separator to match SQLite's datetime('now') default
+        # AND the format used by SyncManager._last_sync_time, so the
+        # "modified since last sync" check stays apples-to-apples.
+        kwargs["updated_at"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         sets = ", ".join(f"{k}=?" for k in kwargs)
         vals = list(kwargs.values()) + [nid]
         self.conn.execute(f"UPDATE notes SET {sets} WHERE id=?", vals)
@@ -1075,10 +1078,55 @@ class SyncManager:
             # Notes — only send content for notes modified since last sync
             push_data["notes"] = []
             last_sync = getattr(self, '_last_sync_time', '')
+            # Parse last_sync (stored as UTC "YYYY-MM-DD HH:MM:SS") into a datetime
+            last_sync_dt = None
+            if last_sync:
+                try:
+                    last_sync_dt = datetime.strptime(last_sync, "%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    last_sync_dt = None
+
+            def _parse_updated_at(ts):
+                """Parse any of these formats, treat the result as UTC:
+                   "2026-04-17 12:03:14"              (new format & SQL default)
+                   "2026-04-17T20:03:14.123456"       (legacy local-time ISO — mis-timed
+                                                      but lexicographically sortable)
+                   Returns a naive datetime, or None.
+                """
+                if not ts:
+                    return None
+                ts = str(ts).replace('T', ' ').strip()
+                # If looks like legacy local-time (with microseconds), shift to UTC
+                has_micros = '.' in ts
+                for fmt in ("%Y-%m-%d %H:%M:%S.%f",
+                            "%Y-%m-%d %H:%M:%S",
+                            "%Y-%m-%d %H:%M"):
+                    try:
+                        dt = datetime.strptime(ts, fmt)
+                        # Legacy rows used datetime.now() (local). Convert to UTC by
+                        # subtracting the current local offset so the comparison with
+                        # _last_sync_time (UTC) is meaningful. For new UTC rows
+                        # (no microseconds, matches SQL default) don't shift.
+                        if has_micros:
+                            try:
+                                local_offset = datetime.now().astimezone().utcoffset()
+                                if local_offset:
+                                    dt = dt - local_offset
+                            except Exception:
+                                pass
+                        return dt
+                    except ValueError:
+                        continue
+                return None
+
             for n in db.get_notes():
                 nd = dict(n)
                 note_updated = nd.get("updated_at", "")
-                modified = (not last_sync) or (note_updated > last_sync)
+                if last_sync_dt is None:
+                    modified = True  # first-ever sync
+                else:
+                    nu_dt = _parse_updated_at(note_updated)
+                    modified = (nu_dt is None) or (nu_dt > last_sync_dt)
                 entry = {
                     "id": str(nd["id"]), "title": nd["title"],
                     "pinned": bool(nd["pinned"]),

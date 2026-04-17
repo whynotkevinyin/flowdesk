@@ -806,13 +806,20 @@ class SyncManager:
                     cfg = json.load(f)
                 self.sync_url = cfg.get("sync_url", "")
                 self.api_key = cfg.get("api_key", "")
+                # Persisted last-sync timestamp — lets us skip un-modified notes
+                # across app restarts (big speedup: avoids re-pushing 900KB every launch)
+                self._last_sync_time = cfg.get("last_sync_time", "")
                 if self.sync_url:
                     self.status = self.STATUS_IDLE
             except Exception:
                 pass
 
     def save_config(self):
-        cfg = {"sync_url": self.sync_url, "api_key": self.api_key}
+        cfg = {
+            "sync_url": self.sync_url,
+            "api_key": self.api_key,
+            "last_sync_time": getattr(self, "_last_sync_time", ""),
+        }
         try:
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(cfg, f, indent=2)
@@ -1094,6 +1101,8 @@ class SyncManager:
             # Push succeeded — record sync time and clear deletion records
             from datetime import datetime
             self._last_sync_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            # Persist so a restart doesn't force a full re-push of all notes
+            self.save_config()
             db.clear_deleted_event_ids()
             db.clear_sync_deletions()
             db.conn.close()

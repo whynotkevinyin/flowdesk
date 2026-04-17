@@ -1,9 +1,10 @@
 // ============================================================
-// Code.gs — Flowdesk Backend API (v11 — anti-destruction + GCal delete propagation)
+// Code.gs — Flowdesk Backend API (v12 — content-hash short-circuit for notes)
 // ============================================================
 // Notes content → Google Drive files (no 50K limit)
 // Events ↔ Google Calendar (bidirectional sync, delete propagation)
 // Groups/Tasks/Members: anti-destruction guard — empty payloads NEVER wipe cloud
+// v12: Notes sheet stores contentHash (col 13) so unchanged content skips Drive writes
 // ============================================================
 
 // ⚠️ CHANGE THESE to your own secrets!
@@ -23,7 +24,7 @@ function checkAuth(e) {
 
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
-  if (action === 'ping') return json({ ok: true, version: 11 });
+  if (action === 'ping') return json({ ok: true, version: 12 });
   if (!checkAuth(e)) return json({ error: 'Unauthorized', code: 401 });
   if (action === 'init') return json(initSheet());
   if (action === 'getTasks') return json(getAllData());
@@ -204,19 +205,44 @@ function getNotesFolder() {
   return DriveApp.createFolder(DRIVE_FOLDER_NAME);
 }
 
-function saveNoteToDrive(noteId, title, content, existingFileId) {
+// Fast MD5-ish hash of note content (hex string). Used to short-circuit
+// Drive writes when the incoming content is identical to what's already stored.
+function hashContent(s) {
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.MD5,
+    String(s || ''),
+    Utilities.Charset.UTF_8
+  );
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i] < 0 ? bytes[i] + 256 : bytes[i];
+    hex += (b < 16 ? '0' : '') + b.toString(16);
+  }
+  return hex;
+}
+
+// Returns { driveFileId, contentHash, wrote }.
+// Skips the Drive write entirely when the hash matches existingHash.
+function saveNoteToDrive(noteId, title, content, existingFileId, existingHash) {
+  const newHash = hashContent(content);
+  const fileName = 'note_' + noteId + '_' + (title || 'untitled').substring(0, 50);
+
+  // Fast path: content unchanged AND we have a Drive file already → skip I/O
+  if (existingFileId && existingHash && existingHash === newHash) {
+    return { driveFileId: existingFileId, contentHash: newHash, wrote: false };
+  }
+
   const folder = getNotesFolder();
   if (existingFileId) {
     try {
       const file = DriveApp.getFileById(existingFileId);
       file.setContent(content || '');
-      file.setName('note_' + noteId + '_' + (title || 'untitled').substring(0, 50));
-      return existingFileId;
-    } catch (e) { /* File not found — create new */ }
+      file.setName(fileName);
+      return { driveFileId: existingFileId, contentHash: newHash, wrote: true };
+    } catch (e) { /* File not found — fall through and create new */ }
   }
-  const fileName = 'note_' + noteId + '_' + (title || 'untitled').substring(0, 50);
   const file = folder.createFile(fileName, content || '', MimeType.PLAIN_TEXT);
-  return file.getId();
+  return { driveFileId: file.getId(), contentHash: newHash, wrote: true };
 }
 
 function readNoteFromDrive(fileId) {
@@ -294,10 +320,17 @@ function initSheet() {
   let notesSheet = ss.getSheetByName('Notes');
   if (!notesSheet) {
     notesSheet = ss.insertSheet('Notes');
-    notesSheet.appendRow(['id','title','driveFileId','pinned','folder','sortOrder','createdAt','updatedAt','tags','font','icon','cover']);
-    notesSheet.getRange(1,1,1,12).setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
+    notesSheet.appendRow(['id','title','driveFileId','pinned','folder','sortOrder','createdAt','updatedAt','tags','font','icon','cover','contentHash']);
+    notesSheet.getRange(1,1,1,13).setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
     notesSheet.setFrozenRows(1);
-    notesSheet.setColumnWidths(1,12,140);
+    notesSheet.setColumnWidths(1,13,140);
+  } else {
+    // v12 migration: add contentHash header at column 13 if missing
+    const nLastCol = Math.max(notesSheet.getLastColumn(), 12);
+    const nHeaders = notesSheet.getRange(1,1,1,nLastCol).getValues()[0];
+    if (nLastCol < 13 || nHeaders[12] !== 'contentHash') {
+      notesSheet.getRange(1,13).setValue('contentHash').setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
+    }
   }
 
   const sheet1 = ss.getSheetByName('Sheet1');
@@ -674,12 +707,17 @@ function syncAll(fullData) {
       (Array.isArray(fullData.deletedNoteIds) ? fullData.deletedNoteIds : []).map(String)
     );
 
-    // Load existing notes → id-to-driveFileId map
-    const existingNoteMap = {};  // noteId → driveFileId
+    // Load existing notes → id-to-(driveFileId + contentHash) map
+    const existingNoteMap = {};   // noteId → driveFileId
+    const existingHashMap = {};   // noteId → contentHash
     if (ns.getLastRow() > 1) {
-      const existing = ns.getRange(2, 1, ns.getLastRow() - 1, 3).getValues();
+      const nCols = Math.min(ns.getLastColumn(), 13);
+      const existing = ns.getRange(2, 1, ns.getLastRow() - 1, nCols).getValues();
       existing.forEach(r => {
-        if (r[0]) existingNoteMap[String(r[0])] = String(r[2] || '');
+        if (r[0]) {
+          existingNoteMap[String(r[0])] = String(r[2] || '');
+          if (nCols >= 13) existingHashMap[String(r[0])] = String(r[12] || '');
+        }
       });
     }
 
@@ -694,31 +732,36 @@ function syncAll(fullData) {
     const hasDeletions = deletedNoteIds.size > 0;
 
     if (notesPayload.length > 0 || hasDeletions) {
-      if (ns.getLastRow() > 1) ns.getRange(2,1,ns.getLastRow()-1,12).clearContent();
+      if (ns.getLastRow() > 1) ns.getRange(2,1,ns.getLastRow()-1,13).clearContent();
       const noteRows = [];
       notesPayload.forEach(n => {
         const noteId = String(n.id || '');
         if (!noteId || deletedNoteIds.has(noteId)) return;  // skip deleted
         const existingFileId = existingNoteMap[noteId] || '';
+        const existingHash = existingHashMap[noteId] || '';
         let driveFileId = existingFileId;
-        // Only write to Drive if content key is present (modified note)
+        let contentHash = existingHash;  // preserve hash if no content sent
+        // Only consider Drive write if content key is present (modified note claim)
         if ('content' in n) {
-          driveFileId = saveNoteToDrive(noteId, n.title, n.content || '', existingFileId);
+          const res = saveNoteToDrive(noteId, n.title, n.content || '', existingFileId, existingHash);
+          driveFileId = res.driveFileId;
+          contentHash = res.contentHash;
+          // res.wrote === false means content hash matched and we skipped the Drive I/O
         }
         const tagsStr = Array.isArray(n.tags) ? n.tags.join(',') : (n.tags || '');
         noteRows.push([
           noteId, n.title || '', driveFileId, n.pinned ? 1 : 0,
           n.folder || '', n.sortOrder || 0, n.createdAt || now, now,
-          tagsStr, n.font || 'sans', n.icon || '', n.cover || ''
+          tagsStr, n.font || 'sans', n.icon || '', n.cover || '', contentHash
         ]);
       });
       if (noteRows.length > 0) {
-        ns.getRange(2, 1, noteRows.length, 12).setValues(noteRows);
+        ns.getRange(2, 1, noteRows.length, 13).setValues(noteRows);
       }
     }
   }
 
-  return { success: true, timestamp: now, version: 11 };
+  return { success: true, timestamp: now, version: 12 };
 }
 
 function fmtDate(v) {

@@ -938,15 +938,24 @@ class SyncManager:
                     t = rev.get("title", "")
                     rid = rev.get("id", "")
                     gcal_id = rev.get("gcalId", "")
-                    # Parse time - handle ISO format from Google Sheets
-                    st = rev.get("startTime", "")
-                    et = rev.get("endTime", "")
-                    if "T" in st:
-                        try: st = st.split("T")[1][:5]
-                        except: pass
-                    if "T" in et:
-                        try: et = et.split("T")[1][:5]
-                        except: pass
+                    # Parse time - handle ISO format from older Google Sheets data
+                    def _parse_sync_time(val):
+                        if not val: return ""
+                        val = str(val)
+                        import re
+                        if re.match(r'^\d{2}:\d{2}$', val): return val
+                        if "T" in val:
+                            try:
+                                from datetime import datetime as _dt
+                                d = _dt.fromisoformat(val.replace("Z", "+00:00"))
+                                local = d.astimezone()
+                                return f"{local.hour:02d}:{local.minute:02d}"
+                            except:
+                                try: return val.split("T")[1][:5]
+                                except: pass
+                        return val
+                    st = _parse_sync_time(rev.get("startTime", ""))
+                    et = _parse_sync_time(rev.get("endTime", ""))
 
                     # Check if already exists locally (by id, gcal_id, or title)
                     existing = local_ev_ids.get(rid) or local_gcal_ids.get(gcal_id) or local_ev_titles.get(t)

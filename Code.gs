@@ -1,8 +1,9 @@
 // ============================================================
-// Code.gs — Flowdesk Backend API (v10 - merge sync strategy for events)
+// Code.gs — Flowdesk Backend API (v11 — anti-destruction + GCal delete propagation)
 // ============================================================
 // Notes content → Google Drive files (no 50K limit)
-// Events ↔ Google Calendar (bidirectional sync)
+// Events ↔ Google Calendar (bidirectional sync, delete propagation)
+// Groups/Tasks/Members: anti-destruction guard — empty payloads NEVER wipe cloud
 // ============================================================
 
 // ⚠️ CHANGE THESE to your own secrets!
@@ -22,7 +23,7 @@ function checkAuth(e) {
 
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
-  if (action === 'ping') return json({ ok: true, version: 10 });
+  if (action === 'ping') return json({ ok: true, version: 11 });
   if (!checkAuth(e)) return json({ error: 'Unauthorized', code: 401 });
   if (action === 'init') return json(initSheet());
   if (action === 'getTasks') return json(getAllData());
@@ -81,7 +82,8 @@ function syncEventToGCal(ev, existingGcalId) {
   if (!dateStr) return '';
 
   try {
-    const eventDate = new Date(dateStr + 'T00:00:00');
+    // Use noon to avoid DST boundary surprises around midnight
+    const eventDate = new Date(dateStr + 'T12:00:00');
     let gcalEvent = null;
 
     // Try to update existing
@@ -99,6 +101,10 @@ function syncEventToGCal(ev, existingGcalId) {
         const end = parseTime(dateStr, ev.endTime || '10:00');
         gcalEvent.setTime(start, end);
       }
+      // Update description if present
+      if (typeof ev.description === 'string') {
+        try { gcalEvent.setDescription(ev.description); } catch(e) {}
+      }
       return existingGcalId;
     } else {
       // Create new event
@@ -112,12 +118,30 @@ function syncEventToGCal(ev, existingGcalId) {
       // Tag it as Flowdesk event
       gcalEvent.setTag('flowdesk', 'true');
       gcalEvent.setTag('flowdesk_id', String(ev.id || ''));
+      if (typeof ev.description === 'string' && ev.description) {
+        try { gcalEvent.setDescription(ev.description); } catch(e) {}
+      }
       return gcalEvent.getId();
     }
   } catch (e) {
     Logger.log('syncEventToGCal error: ' + e.message);
     return existingGcalId || '';
   }
+}
+
+function deleteGCalEvent(gcalId) {
+  if (!gcalId) return false;
+  try {
+    const cal = getFlowdeskCalendar();
+    const gev = cal.getEventById(gcalId);
+    if (gev) {
+      gev.deleteEvent();
+      return true;
+    }
+  } catch (e) {
+    Logger.log('deleteGCalEvent error for ' + gcalId + ': ' + e.message);
+  }
+  return false;
 }
 
 function parseTime(dateStr, timeStr) {
@@ -138,6 +162,7 @@ function pullGCalEvents() {
     const end = new Date(now.getTime() + 365 * 86400000);   // 1 year ahead
     const gcalEvents = cal.getEvents(start, end);
     const pulled = [];
+    const tz = Session.getScriptTimeZone();
 
     gcalEvents.forEach(ge => {
       const flowdeskTag = ge.getTag('flowdesk');
@@ -147,15 +172,20 @@ function pullGCalEvents() {
       const startDate = isAllDay ? ge.getAllDayStartDate() : ge.getStartTime();
       const endDate = isAllDay ? ge.getAllDayEndDate() : ge.getEndTime();
 
+      // Use full GCal ID hash to avoid any potential collision from truncation
+      const fullId = ge.getId();
+      const shortId = fullId.replace(/@.*/, '');
+
       pulled.push({
-        id: 'gcal_' + ge.getId().replace(/@.*/, '').substring(0, 20),
-        gcalId: ge.getId(),
+        id: 'gcal_' + shortId,
+        gcalId: fullId,
         title: ge.getTitle() || 'Untitled',
-        date: Utilities.formatDate(startDate, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
-        startTime: isAllDay ? '' : Utilities.formatDate(startDate, Session.getScriptTimeZone(), 'HH:mm'),
-        endTime: isAllDay ? '' : Utilities.formatDate(endDate, Session.getScriptTimeZone(), 'HH:mm'),
+        date: Utilities.formatDate(startDate, tz, 'yyyy-MM-dd'),
+        startTime: isAllDay ? '' : Utilities.formatDate(startDate, tz, 'HH:mm'),
+        endTime: isAllDay ? '' : Utilities.formatDate(endDate, tz, 'HH:mm'),
         color: '#0073ea',
         allDay: isAllDay,
+        description: (function(){ try { return ge.getDescription() || ''; } catch(e){ return ''; } })(),
         fromGCal: true
       });
     });
@@ -196,6 +226,17 @@ function readNoteFromDrive(fileId) {
   } catch (e) {
     return '[Error reading note: ' + e.message + ']';
   }
+}
+
+function trashNoteDriveFile(fileId) {
+  if (!fileId) return false;
+  try {
+    const file = DriveApp.getFileById(fileId);
+    if (file) { file.setTrashed(true); return true; }
+  } catch (e) {
+    Logger.log('trashNoteDriveFile error: ' + e.message);
+  }
+  return false;
 }
 
 // ── Initialize Sheets ──
@@ -311,17 +352,20 @@ function getAllData() {
   const eventsSheet = ss.getSheetByName('Events');
   const events = [];
   const sheetEventIds = new Set();
+  const knownGcalIds = new Set();
   if (eventsSheet && eventsSheet.getLastRow() > 1) {
     const cols = Math.min(eventsSheet.getLastColumn(), 11);
     const eData = eventsSheet.getRange(2,1,eventsSheet.getLastRow()-1,cols).getValues();
     eData.forEach(r => {
       if(r[0]) {
         sheetEventIds.add(String(r[0]));
+        const gcalIdVal = cols >= 10 ? String(r[9]||'') : '';
+        if (gcalIdVal) knownGcalIds.add(gcalIdVal);
         events.push({
           id:String(r[0]), title:r[1], date:fmtDate(r[2]),
           startTime:fmtTime(r[3]), endTime:fmtTime(r[4]),
           color:r[5]||'#0073ea', allDay:r[6]?true:false,
-          gcalId: (cols >= 10 ? String(r[9]||'') : ''),
+          gcalId: gcalIdVal,
           description: (cols >= 11 ? String(r[10]||'') : '')
         });
       }
@@ -331,10 +375,10 @@ function getAllData() {
   // Pull Google Calendar events (non-Flowdesk ones)
   const gcalEvents = pullGCalEvents();
   gcalEvents.forEach(ge => {
-    // Only add if not already in our sheet
-    if (!sheetEventIds.has(ge.id)) {
-      events.push(ge);
-    }
+    // Skip if we already have this event (by id or gcalId)
+    if (sheetEventIds.has(ge.id)) return;
+    if (ge.gcalId && knownGcalIds.has(ge.gcalId)) return;
+    events.push(ge);
   });
 
   // Notes
@@ -405,24 +449,31 @@ function getAllDataLight() {
   const eventsSheet = ss.getSheetByName('Events');
   const events = [];
   const sheetEventIds = new Set();
+  const knownGcalIds = new Set();
   if (eventsSheet && eventsSheet.getLastRow() > 1) {
     const cols = Math.min(eventsSheet.getLastColumn(), 11);
     const eData = eventsSheet.getRange(2,1,eventsSheet.getLastRow()-1,cols).getValues();
     eData.forEach(r => {
       if(r[0]) {
         sheetEventIds.add(String(r[0]));
+        const gcalIdVal = cols >= 10 ? String(r[9]||'') : '';
+        if (gcalIdVal) knownGcalIds.add(gcalIdVal);
         events.push({
           id:String(r[0]), title:r[1], date:fmtDate(r[2]),
           startTime:fmtTime(r[3]), endTime:fmtTime(r[4]),
           color:r[5]||'#0073ea', allDay:r[6]?true:false,
-          gcalId: (cols >= 10 ? String(r[9]||'') : ''),
+          gcalId: gcalIdVal,
           description: (cols >= 11 ? String(r[10]||'') : '')
         });
       }
     });
   }
   const gcalEvents = pullGCalEvents();
-  gcalEvents.forEach(ge => { if (!sheetEventIds.has(ge.id)) events.push(ge); });
+  gcalEvents.forEach(ge => {
+    if (sheetEventIds.has(ge.id)) return;
+    if (ge.gcalId && knownGcalIds.has(ge.gcalId)) return;
+    events.push(ge);
+  });
 
   // Notes — metadata only, NO content (this is what makes it fast)
   const notesSheet = ss.getSheetByName('Notes');
@@ -482,46 +533,66 @@ function getNoteContentById(noteId) {
 }
 
 // ── Sync All ──
+// v11 contract:
+//   groups: [{id, title, color, tasks:[...]}]     — IF present AND non-empty, replaces ALL groups+tasks on cloud
+//                                                   IF missing OR empty array, groups/tasks sheets are LEFT UNTOUCHED
+//   members: [...]                                 — IF present AND non-empty, replaces members; else untouched
+//   events: [...]                                  — MERGED with cloud (client wins for same ID); server-only events preserved
+//   deletedEventIds: [...]                         — events NOT re-preserved, AND corresponding GCal events deleted
+//   notes: [...]                                   — IF present AND non-empty, replaces notes (Drive files kept if no 'content' key)
+//   deletedNoteIds: [...]                          — (v11) notes to hard-delete; their Drive files are trashed
 function syncAll(fullData) {
   const ss = ensureSheets();
   const now = new Date().toISOString();
 
-  // Groups
+  // ── Groups ── (anti-destruction: only clear if payload is non-empty)
   const gs = ss.getSheetByName('Groups');
   if (!gs) return { error: 'Groups sheet not found' };
-  if (gs.getLastRow() > 1) gs.getRange(2,1,gs.getLastRow()-1,4).clearContent();
-  (fullData.groups || []).forEach((g,i) => {
-    gs.getRange(i+2,1,1,4).setValues([[g.id, g.title, g.color || '#579bfc', i+1]]);
-  });
-
-  // Tasks
-  const ts = ss.getSheetByName('Tasks');
-  if (!ts) return { error: 'Tasks sheet not found' };
-  if (ts.getLastRow() > 1) ts.getRange(2,1,ts.getLastRow()-1,11).clearContent();
-  let row = 2;
-  (fullData.groups || []).forEach(g => {
-    (g.tasks || []).forEach(t => {
-      ts.getRange(row,1,1,11).setValues([[
-        t.id, g.id, t.name||'', t.status||'', t.priority||'',
-        t.dueDate||'', t.timelineStart||'', t.timelineEnd||'',
-        t.notes||'', t.createdAt||now, now
-      ]]);
-      row++;
-    });
-  });
-
-  // Members
-  const ms = ss.getSheetByName('Members');
-  if (ms && fullData.members && fullData.members.length > 0) {
-    if (ms.getLastRow() > 1) ms.getRange(2,1,ms.getLastRow()-1,1).clearContent();
-    fullData.members.forEach((m,i) => { ms.getRange(i+2,1).setValue(m); });
+  const groupsPayload = Array.isArray(fullData.groups) ? fullData.groups : [];
+  if (groupsPayload.length > 0) {
+    if (gs.getLastRow() > 1) gs.getRange(2,1,gs.getLastRow()-1,4).clearContent();
+    const groupsRows = groupsPayload.map((g, i) => [
+      g.id || '', g.title || '', g.color || '#579bfc', i + 1
+    ]);
+    if (groupsRows.length > 0) {
+      gs.getRange(2, 1, groupsRows.length, 4).setValues(groupsRows);
+    }
   }
 
-  // Events — MERGE strategy: client wins for matching IDs, server-only events preserved
+  // ── Tasks ── (anti-destruction: only rewrite when client actually sent groups)
+  // Rationale: tasks live under groups; if client omitted groups, don't nuke tasks either
+  const ts = ss.getSheetByName('Tasks');
+  if (!ts) return { error: 'Tasks sheet not found' };
+  if (groupsPayload.length > 0) {
+    if (ts.getLastRow() > 1) ts.getRange(2,1,ts.getLastRow()-1,11).clearContent();
+    const taskRows = [];
+    groupsPayload.forEach(g => {
+      (g.tasks || []).forEach(t => {
+        taskRows.push([
+          t.id || '', g.id || '', t.name || '', t.status || '', t.priority || '',
+          t.dueDate || '', t.timelineStart || '', t.timelineEnd || '',
+          t.notes || '', t.createdAt || now, now
+        ]);
+      });
+    });
+    if (taskRows.length > 0) {
+      ts.getRange(2, 1, taskRows.length, 11).setValues(taskRows);
+    }
+  }
+
+  // ── Members ── (already had anti-destruction; keep it)
+  const ms = ss.getSheetByName('Members');
+  if (ms && Array.isArray(fullData.members) && fullData.members.length > 0) {
+    if (ms.getLastRow() > 1) ms.getRange(2,1,ms.getLastRow()-1,1).clearContent();
+    const memberRows = fullData.members.map(m => [m]);
+    ms.getRange(2, 1, memberRows.length, 1).setValues(memberRows);
+  }
+
+  // ── Events ── MERGE strategy + GCal delete propagation
   const es = ss.getSheetByName('Events');
   if (es) {
-    // Read ALL existing server events (including ones client may not have)
-    const existingServerEvents = {};  // eventId → row data
+    // Read ALL existing server events into a map for merging
+    const existingServerEvents = {};  // eventId → row array
     const existingGcalMap = {};       // eventId → gcalId
     if (es.getLastRow() > 1) {
       const cols = Math.min(es.getLastColumn(), 11);
@@ -536,15 +607,27 @@ function syncAll(fullData) {
       es.getRange(2,1,es.getLastRow()-1,11).clearContent();
     }
 
-    // Build set of client event IDs
+    // Set of deleted IDs (propagate deletes to GCal)
+    const deletedIds = new Set(
+      (Array.isArray(fullData.deletedEventIds) ? fullData.deletedEventIds : []).map(String)
+    );
+
+    // 1) Delete GCal counterparts BEFORE rebuilding the sheet
+    deletedIds.forEach(eid => {
+      const gcalId = existingGcalMap[eid] || '';
+      if (gcalId) deleteGCalEvent(gcalId);
+    });
+
+    // 2) Client events (client wins for matching IDs) — gather into buffer, write once
+    const outRows = [];
+    const clientEvents = Array.isArray(fullData.events) ? fullData.events : [];
     const clientEventIds = new Set();
-    const clientEvents = fullData.events || [];
     clientEvents.forEach(ev => clientEventIds.add(String(ev.id)));
 
-    // Write client events first (client wins for matching IDs)
-    let evRow = 0;
     clientEvents.forEach((ev) => {
       const evId = String(ev.id);
+      // Skip any client event the client ALSO marked for deletion (shouldn't happen but be safe)
+      if (deletedIds.has(evId)) return;
       const isFromGCal = ev.fromGCal || evId.startsWith('gcal_');
       const existingGcalId = existingGcalMap[evId] || ev.gcalId || '';
 
@@ -555,61 +638,87 @@ function syncAll(fullData) {
 
       const stFmt = fmtTime(ev.startTime);
       const etFmt = fmtTime(ev.endTime);
-      es.getRange(evRow+2,1,1,11).setValues([[
-        evId, ev.title||'', ev.date||'', stFmt, etFmt,
-        ev.color||'#0073ea', ev.allDay?1:0, ev.createdAt||now, now, gcalId, ev.description||''
-      ]]);
-      if (stFmt) es.getRange(evRow+2,4).setNumberFormat('@');
-      if (etFmt) es.getRange(evRow+2,5).setNumberFormat('@');
-      evRow++;
+      outRows.push([
+        evId, ev.title || '', ev.date || '', stFmt, etFmt,
+        ev.color || '#0073ea', ev.allDay ? 1 : 0,
+        ev.createdAt || now, now, gcalId, ev.description || ''
+      ]);
     });
 
-    // Append server-only events (IDs not in client data) — preserve them
-    // But skip events the client explicitly deleted
-    const deletedIds = new Set((fullData.deletedEventIds || []).map(String));
+    // 3) Append server-only events (IDs not in client data, not deleted)
     Object.keys(existingServerEvents).forEach(eid => {
-      if (!clientEventIds.has(eid) && !deletedIds.has(eid)) {
-        const r = existingServerEvents[eid];
-        const stFmt = fmtTime(r[3]);
-        const etFmt = fmtTime(r[4]);
-        es.getRange(evRow+2,1,1,11).setValues([[
-          String(r[0]), r[1]||'', fmtDate(r[2])||'', stFmt, etFmt,
-          r[5]||'#0073ea', r[6]?1:0, r[7]||now, now, r[9]||'', (r.length>10?r[10]:'') ||''
-        ]]);
-        if (stFmt) es.getRange(evRow+2,4).setNumberFormat('@');
-        if (etFmt) es.getRange(evRow+2,5).setNumberFormat('@');
-        evRow++;
-      }
+      if (clientEventIds.has(eid) || deletedIds.has(eid)) return;
+      const r = existingServerEvents[eid];
+      const stFmt = fmtTime(r[3]);
+      const etFmt = fmtTime(r[4]);
+      outRows.push([
+        String(r[0]), r[1] || '', fmtDate(r[2]) || '', stFmt, etFmt,
+        r[5] || '#0073ea', r[6] ? 1 : 0, r[7] || now, now,
+        r[9] || '', (r.length > 10 ? r[10] : '') || ''
+      ]);
     });
-  }
 
-  // Notes — only overwrite if non-empty; skip Drive write if no content key (incremental sync)
-  const ns = ss.getSheetByName('Notes');
-  if (ns && fullData.notes && fullData.notes.length > 0) {
-    const existingMap = {};  // noteId → driveFileId
-    if (ns.getLastRow() > 1) {
-      const existing = ns.getRange(2,1,ns.getLastRow()-1,3).getValues();
-      existing.forEach(r => { if (r[0] && r[2]) existingMap[String(r[0])] = String(r[2]); });
-      ns.getRange(2,1,ns.getLastRow()-1,12).clearContent();
+    // 4) Write everything at once
+    if (outRows.length > 0) {
+      es.getRange(2, 1, outRows.length, 11).setValues(outRows);
+      // Force time columns to plain-text format so Sheets doesn't reformat "09:00" into a date
+      es.getRange(2, 4, outRows.length, 2).setNumberFormat('@');
     }
-    (fullData.notes || []).forEach((n,i) => {
-      const noteId = String(n.id);
-      const existingFileId = existingMap[noteId] || '';
-      let driveFileId = existingFileId;
-      // Only write to Drive if content key is present (modified note)
-      if ('content' in n) {
-        driveFileId = saveNoteToDrive(noteId, n.title, n.content || '', existingFileId);
-      }
-      const tagsStr = Array.isArray(n.tags) ? n.tags.join(',') : (n.tags || '');
-      ns.getRange(i+2,1,1,12).setValues([[
-        noteId, n.title||'', driveFileId, n.pinned?1:0,
-        n.folder||'', n.sortOrder||0, n.createdAt||now, now,
-        tagsStr, n.font||'sans', n.icon||'', n.cover||''
-      ]]);
-    });
   }
 
-  return { success: true, timestamp: now };
+  // ── Notes ── delete first, then upsert
+  const ns = ss.getSheetByName('Notes');
+  if (ns) {
+    // (a) Hard-delete notes listed in deletedNoteIds (trash Drive files too)
+    const deletedNoteIds = new Set(
+      (Array.isArray(fullData.deletedNoteIds) ? fullData.deletedNoteIds : []).map(String)
+    );
+
+    // Load existing notes → id-to-driveFileId map
+    const existingNoteMap = {};  // noteId → driveFileId
+    if (ns.getLastRow() > 1) {
+      const existing = ns.getRange(2, 1, ns.getLastRow() - 1, 3).getValues();
+      existing.forEach(r => {
+        if (r[0]) existingNoteMap[String(r[0])] = String(r[2] || '');
+      });
+    }
+
+    // Trash Drive files for deleted notes
+    deletedNoteIds.forEach(nid => {
+      const fid = existingNoteMap[nid];
+      if (fid) trashNoteDriveFile(fid);
+    });
+
+    // (b) Upsert full notes payload (only if non-empty — anti-destruction)
+    const notesPayload = Array.isArray(fullData.notes) ? fullData.notes : [];
+    const hasDeletions = deletedNoteIds.size > 0;
+
+    if (notesPayload.length > 0 || hasDeletions) {
+      if (ns.getLastRow() > 1) ns.getRange(2,1,ns.getLastRow()-1,12).clearContent();
+      const noteRows = [];
+      notesPayload.forEach(n => {
+        const noteId = String(n.id || '');
+        if (!noteId || deletedNoteIds.has(noteId)) return;  // skip deleted
+        const existingFileId = existingNoteMap[noteId] || '';
+        let driveFileId = existingFileId;
+        // Only write to Drive if content key is present (modified note)
+        if ('content' in n) {
+          driveFileId = saveNoteToDrive(noteId, n.title, n.content || '', existingFileId);
+        }
+        const tagsStr = Array.isArray(n.tags) ? n.tags.join(',') : (n.tags || '');
+        noteRows.push([
+          noteId, n.title || '', driveFileId, n.pinned ? 1 : 0,
+          n.folder || '', n.sortOrder || 0, n.createdAt || now, now,
+          tagsStr, n.font || 'sans', n.icon || '', n.cover || ''
+        ]);
+      });
+      if (noteRows.length > 0) {
+        ns.getRange(2, 1, noteRows.length, 12).setValues(noteRows);
+      }
+    }
+  }
+
+  return { success: true, timestamp: now, version: 11 };
 }
 
 function fmtDate(v) {

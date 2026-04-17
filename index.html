@@ -2515,6 +2515,7 @@
                     return t;
                 }
                 if (data.events) {
+                    console.log('[SYNC PULL] Events from server:', data.events.map(e => e.id + ' ' + e.title + ' ' + (e.startTime||e.start_time) + '-' + (e.endTime||e.end_time)));
                     const serverEvents = data.events.map(ev => ({
                         id: String(ev.id || Date.now()),
                         title: ev.title || '',
@@ -2587,6 +2588,7 @@
 
         async function pushSync(includeNotes = false) {
             try {
+                console.log('[SYNC PUSH] Starting push...');
                 const pushData = {
                     action: 'syncAll',
                     key: FLOWDESK_API_KEY || localStorage.getItem('flowdesk_api_key') || '',
@@ -2623,6 +2625,8 @@
                     redirect: 'follow'
                 });
                 const result = await resp.json();
+                console.log('[SYNC PUSH] Events sent:', pushData.events.map(e => e.id + ' ' + e.title + ' ' + e.startTime + '-' + e.endTime));
+                console.log('[SYNC PUSH] Server response:', JSON.stringify(result).substring(0, 200));
                 if (result.error) console.error('Push sync error:', result.error);
                 else clearDeletedEventIds();  // Push succeeded, clear pending deletes
             } catch (e) { console.error('Push sync failed:', e); }

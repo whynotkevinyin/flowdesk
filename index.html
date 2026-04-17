@@ -3795,13 +3795,27 @@
                     <div id="evTimeRow" style="display:${ev.all_day?'none':'flex'};gap:12px;">
                         <div style="flex:1;">
                             <label style="font-size:12px;font-weight:500;color:${modalText};opacity:0.7;margin-bottom:4px;display:block;">Start</label>
-                            <input id="evStart" type="time" value="${ev.start_time||'09:00'}"
-                                style="width:100%;padding:9px 12px;border:1px solid ${modalBorder};border-radius:8px;font-size:14px;background:${inputBg};color:${modalText};box-sizing:border-box;outline:none;">
+                            <div style="display:flex;gap:4px;align-items:center;">
+                                <select id="evStartH" style="flex:1;padding:9px 8px;border:1px solid ${modalBorder};border-radius:8px;font-size:14px;background:${inputBg};color:${modalText};outline:none;cursor:pointer;">
+                                    ${Array.from({length:24},(_,i)=>`<option value="${String(i).padStart(2,'0')}" ${String(i).padStart(2,'0')===(ev.start_time||'09:00').split(':')[0]?'selected':''}>${String(i).padStart(2,'0')}</option>`).join('')}
+                                </select>
+                                <span style="color:${modalText};font-weight:600;">:</span>
+                                <select id="evStartM" style="flex:1;padding:9px 8px;border:1px solid ${modalBorder};border-radius:8px;font-size:14px;background:${inputBg};color:${modalText};outline:none;cursor:pointer;">
+                                    ${Array.from({length:12},(_,i)=>`<option value="${String(i*5).padStart(2,'0')}" ${String(i*5).padStart(2,'0')===(ev.start_time||'09:00').split(':')[1]?'selected':''}>${String(i*5).padStart(2,'0')}</option>`).join('')}
+                                </select>
+                            </div>
                         </div>
                         <div style="flex:1;">
                             <label style="font-size:12px;font-weight:500;color:${modalText};opacity:0.7;margin-bottom:4px;display:block;">End</label>
-                            <input id="evEnd" type="time" value="${ev.end_time||'10:00'}"
-                                style="width:100%;padding:9px 12px;border:1px solid ${modalBorder};border-radius:8px;font-size:14px;background:${inputBg};color:${modalText};box-sizing:border-box;outline:none;">
+                            <div style="display:flex;gap:4px;align-items:center;">
+                                <select id="evEndH" style="flex:1;padding:9px 8px;border:1px solid ${modalBorder};border-radius:8px;font-size:14px;background:${inputBg};color:${modalText};outline:none;cursor:pointer;">
+                                    ${Array.from({length:24},(_,i)=>`<option value="${String(i).padStart(2,'0')}" ${String(i).padStart(2,'0')===(ev.end_time||'10:00').split(':')[0]?'selected':''}>${String(i).padStart(2,'0')}</option>`).join('')}
+                                </select>
+                                <span style="color:${modalText};font-weight:600;">:</span>
+                                <select id="evEndM" style="flex:1;padding:9px 8px;border:1px solid ${modalBorder};border-radius:8px;font-size:14px;background:${inputBg};color:${modalText};outline:none;cursor:pointer;">
+                                    ${Array.from({length:12},(_,i)=>`<option value="${String(i*5).padStart(2,'0')}" ${String(i*5).padStart(2,'0')===(ev.end_time||'10:00').split(':')[1]?'selected':''}>${String(i*5).padStart(2,'0')}</option>`).join('')}
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div>
@@ -3834,6 +3848,17 @@
                 document.getElementById('evTimeRow').style.display = e.target.checked ? 'none' : 'flex';
             });
 
+            // Auto-set end time = start time + 1 hour when start changes
+            const autoSetEndTime = () => {
+                let h = parseInt(document.getElementById('evStartH').value, 10);
+                const m = document.getElementById('evStartM').value;
+                h = (h + 1) % 24;
+                document.getElementById('evEndH').value = String(h).padStart(2, '0');
+                document.getElementById('evEndM').value = m;
+            };
+            document.getElementById('evStartH').addEventListener('change', autoSetEndTime);
+            document.getElementById('evStartM').addEventListener('change', autoSetEndTime);
+
             // Shared cleanup
             const closeModal = () => { overlay.remove(); document.removeEventListener('keydown', escHandler); };
 
@@ -3854,8 +3879,8 @@
                 const data = {
                     title,
                     event_date: evDateVal,
-                    start_time: document.getElementById('evStart').value || '09:00',
-                    end_time: document.getElementById('evEnd').value || '10:00',
+                    start_time: document.getElementById('evStartH').value + ':' + document.getElementById('evStartM').value,
+                    end_time: document.getElementById('evEndH').value + ':' + document.getElementById('evEndM').value,
                     color: selectedColor ? selectedColor.value : '#0073ea',
                     all_day: document.getElementById('evAllDay').checked,
                     description: document.getElementById('evDesc').value.trim()

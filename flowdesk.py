@@ -1245,6 +1245,10 @@ class EventEditDialog(QDialog):
         time_row.addWidget(self.end_time)
         form.addRow("Time:", time_row)
 
+        # Auto-set end time = start + 1 hour when start changes
+        self._auto_end = True
+        self.start_time.timeChanged.connect(self._on_start_time_changed)
+
         # Color picker
         self._event_color = ev["color"]
         color_row = QHBoxLayout()
@@ -1283,6 +1287,10 @@ class EventEditDialog(QDialog):
 
     def _set_color(self, color):
         self._event_color = color
+
+    def _on_start_time_changed(self, new_time):
+        if self._auto_end:
+            self.end_time.setTime(new_time.addSecs(3600))
 
     def _toggle_time(self):
         hide = self.all_day_check.isChecked()

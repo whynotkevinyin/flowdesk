@@ -1,5 +1,5 @@
 // ============================================================
-// Code.gs — Flowdesk Backend API (v9 - time format fix + description sync)
+// Code.gs — Flowdesk Backend API (v10 - merge sync strategy for events)
 // ============================================================
 // Notes content → Google Drive files (no 50K limit)
 // Events ↔ Google Calendar (bidirectional sync)
@@ -22,7 +22,7 @@ function checkAuth(e) {
 
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
-  if (action === 'ping') return json({ ok: true, version: 7 });
+  if (action === 'ping') return json({ ok: true, version: 10 });
   if (!checkAuth(e)) return json({ error: 'Unauthorized', code: 401 });
   if (action === 'init') return json(initSheet());
   if (action === 'getTasks') return json(getAllData());
@@ -517,41 +517,67 @@ function syncAll(fullData) {
     fullData.members.forEach((m,i) => { ms.getRange(i+2,1).setValue(m); });
   }
 
-  // Events — sync to Sheet AND to Google Calendar
+  // Events — MERGE strategy: client wins for matching IDs, server-only events preserved
   const es = ss.getSheetByName('Events');
-  if (es && fullData.events && fullData.events.length > 0) {
-    // Read existing gcalId mappings
-    const existingGcalMap = {};  // eventId → gcalId
+  if (es) {
+    // Read ALL existing server events (including ones client may not have)
+    const existingServerEvents = {};  // eventId → row data
+    const existingGcalMap = {};       // eventId → gcalId
     if (es.getLastRow() > 1) {
       const cols = Math.min(es.getLastColumn(), 11);
       const existing = es.getRange(2,1,es.getLastRow()-1,cols).getValues();
       existing.forEach(r => {
-        if (r[0] && cols >= 10 && r[9]) existingGcalMap[String(r[0])] = String(r[9]);
+        if (r[0]) {
+          const eid = String(r[0]);
+          existingServerEvents[eid] = r;
+          if (cols >= 10 && r[9]) existingGcalMap[eid] = String(r[9]);
+        }
       });
       es.getRange(2,1,es.getLastRow()-1,11).clearContent();
     }
 
-    (fullData.events || []).forEach((ev,i) => {
+    // Build set of client event IDs
+    const clientEventIds = new Set();
+    const clientEvents = fullData.events || [];
+    clientEvents.forEach(ev => clientEventIds.add(String(ev.id)));
+
+    // Write client events first (client wins for matching IDs)
+    let evRow = 0;
+    clientEvents.forEach((ev) => {
       const evId = String(ev.id);
-      // Skip Google Calendar-sourced events (don't re-push them)
       const isFromGCal = ev.fromGCal || evId.startsWith('gcal_');
       const existingGcalId = existingGcalMap[evId] || ev.gcalId || '';
 
       let gcalId = existingGcalId;
       if (!isFromGCal) {
-        // Push Flowdesk events to Google Calendar
         gcalId = syncEventToGCal(ev, existingGcalId);
       }
 
       const stFmt = fmtTime(ev.startTime);
       const etFmt = fmtTime(ev.endTime);
-      es.getRange(i+2,1,1,11).setValues([[
+      es.getRange(evRow+2,1,1,11).setValues([[
         evId, ev.title||'', ev.date||'', stFmt, etFmt,
         ev.color||'#0073ea', ev.allDay?1:0, ev.createdAt||now, now, gcalId, ev.description||''
       ]]);
-      // Force time columns to plain text so Sheets won't auto-convert to Date
-      if (stFmt) es.getRange(i+2,4).setNumberFormat('@');
-      if (etFmt) es.getRange(i+2,5).setNumberFormat('@');
+      if (stFmt) es.getRange(evRow+2,4).setNumberFormat('@');
+      if (etFmt) es.getRange(evRow+2,5).setNumberFormat('@');
+      evRow++;
+    });
+
+    // Append server-only events (IDs not in client data) — preserve them
+    Object.keys(existingServerEvents).forEach(eid => {
+      if (!clientEventIds.has(eid)) {
+        const r = existingServerEvents[eid];
+        const stFmt = fmtTime(r[3]);
+        const etFmt = fmtTime(r[4]);
+        es.getRange(evRow+2,1,1,11).setValues([[
+          String(r[0]), r[1]||'', fmtDate(r[2])||'', stFmt, etFmt,
+          r[5]||'#0073ea', r[6]?1:0, r[7]||now, now, r[9]||'', (r.length>10?r[10]:'') ||''
+        ]]);
+        if (stFmt) es.getRange(evRow+2,4).setNumberFormat('@');
+        if (etFmt) es.getRange(evRow+2,5).setNumberFormat('@');
+        evRow++;
+      }
     });
   }
 

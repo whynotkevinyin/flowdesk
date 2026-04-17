@@ -24,7 +24,7 @@ function checkAuth(e) {
 
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
-  if (action === 'ping') return json({ ok: true, version: 12 });
+  if (action === 'ping') return json({ ok: true, version: 13 });
   if (!checkAuth(e)) return json({ error: 'Unauthorized', code: 401 });
   if (action === 'init') return json(initSheet());
   if (action === 'getTasks') return json(getAllData());
@@ -623,21 +623,27 @@ function syncAll(fullData) {
 
   // ── Events ── MERGE strategy + GCal delete propagation
   const es = ss.getSheetByName('Events');
+  let gcalCallsSkipped = 0, gcalCallsMade = 0;
   if (es) {
-    // Read ALL existing server events into a map for merging
+    // Read ALL existing server events into a map for merging.
+    // Events sheet columns: 0=id 1=title 2=date 3=startTime 4=endTime
+    //   5=color 6=allDay 7=createdAt 8=updatedAt 9=gcalId 10=description
+    //   11=eventHash  (← v13 new, for GCal short-circuit)
     const existingServerEvents = {};  // eventId → row array
     const existingGcalMap = {};       // eventId → gcalId
+    const existingEventHashMap = {};  // eventId → eventHash
     if (es.getLastRow() > 1) {
-      const cols = Math.min(es.getLastColumn(), 11);
+      const cols = Math.min(es.getLastColumn(), 12);
       const existing = es.getRange(2,1,es.getLastRow()-1,cols).getValues();
       existing.forEach(r => {
         if (r[0]) {
           const eid = String(r[0]);
           existingServerEvents[eid] = r;
           if (cols >= 10 && r[9]) existingGcalMap[eid] = String(r[9]);
+          if (cols >= 12 && r[11]) existingEventHashMap[eid] = String(r[11]);
         }
       });
-      es.getRange(2,1,es.getLastRow()-1,11).clearContent();
+      es.getRange(2,1,es.getLastRow()-1,12).clearContent();
     }
 
     // Set of deleted IDs (propagate deletes to GCal)
@@ -664,17 +670,38 @@ function syncAll(fullData) {
       const isFromGCal = ev.fromGCal || evId.startsWith('gcal_');
       const existingGcalId = existingGcalMap[evId] || ev.gcalId || '';
 
-      let gcalId = existingGcalId;
-      if (!isFromGCal) {
-        gcalId = syncEventToGCal(ev, existingGcalId);
-      }
-
+      // Compute a hash of the fields GCal cares about so we can skip the
+      // (expensive) GCal API round-trips when nothing actually changed.
       const stFmt = fmtTime(ev.startTime);
       const etFmt = fmtTime(ev.endTime);
+      const hashInput = [
+        ev.title || '',
+        ev.date || '',
+        stFmt,
+        etFmt,
+        ev.color || '#0073ea',
+        ev.allDay ? '1' : '0',
+        ev.description || ''
+      ].join('|');
+      const newHash = hashContent(hashInput);
+      const existingHash = existingEventHashMap[evId] || '';
+
+      let gcalId = existingGcalId;
+      if (!isFromGCal) {
+        if (existingHash && existingHash === newHash && existingGcalId) {
+          // No change and GCal already linked → skip the GCal API call entirely.
+          gcalCallsSkipped++;
+        } else {
+          gcalId = syncEventToGCal(ev, existingGcalId);
+          gcalCallsMade++;
+        }
+      }
+
       outRows.push([
         evId, ev.title || '', ev.date || '', stFmt, etFmt,
         ev.color || '#0073ea', ev.allDay ? 1 : 0,
-        ev.createdAt || now, now, gcalId, ev.description || ''
+        ev.createdAt || now, now, gcalId, ev.description || '',
+        newHash
       ]);
     });
 
@@ -684,16 +711,18 @@ function syncAll(fullData) {
       const r = existingServerEvents[eid];
       const stFmt = fmtTime(r[3]);
       const etFmt = fmtTime(r[4]);
+      const prevHash = (r.length > 11 ? String(r[11] || '') : '');
       outRows.push([
         String(r[0]), r[1] || '', fmtDate(r[2]) || '', stFmt, etFmt,
         r[5] || '#0073ea', r[6] ? 1 : 0, r[7] || now, now,
-        r[9] || '', (r.length > 10 ? r[10] : '') || ''
+        r[9] || '', (r.length > 10 ? r[10] : '') || '',
+        prevHash
       ]);
     });
 
     // 4) Write everything at once
     if (outRows.length > 0) {
-      es.getRange(2, 1, outRows.length, 11).setValues(outRows);
+      es.getRange(2, 1, outRows.length, 12).setValues(outRows);
       // Force time columns to plain-text format so Sheets doesn't reformat "09:00" into a date
       es.getRange(2, 4, outRows.length, 2).setNumberFormat('@');
     }
@@ -761,7 +790,10 @@ function syncAll(fullData) {
     }
   }
 
-  return { success: true, timestamp: now, version: 12 };
+  return {
+    success: true, timestamp: now, version: 13,
+    diag: { gcalCallsMade: gcalCallsMade, gcalCallsSkipped: gcalCallsSkipped }
+  };
 }
 
 function fmtDate(v) {

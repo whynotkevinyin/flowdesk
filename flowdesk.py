@@ -403,6 +403,10 @@ class Database:
             self.conn.execute("ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
         if "font" not in cols:
             self.conn.execute("ALTER TABLE notes ADD COLUMN font TEXT NOT NULL DEFAULT 'Sans-serif'")
+        if "icon" not in cols:
+            self.conn.execute("ALTER TABLE notes ADD COLUMN icon TEXT NOT NULL DEFAULT ''")
+        if "cover" not in cols:
+            self.conn.execute("ALTER TABLE notes ADD COLUMN cover TEXT NOT NULL DEFAULT ''")
         self.conn.commit()
 
     # ── Groups ──
@@ -1414,7 +1418,7 @@ class CalendarView(QWidget):
         grid.setSpacing(1)
 
         # Day headers
-        for i, day_name in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]):
+        for i, day_name in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]):
             lbl = QLabel(day_name)
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setFont(QFont("Inter", 10, QFont.Weight.Bold))
@@ -1423,7 +1427,7 @@ class CalendarView(QWidget):
 
         # Calendar days
         first_day = date(d.year, d.month, 1)
-        start_weekday = first_day.weekday()  # 0=Mon
+        start_weekday = (first_day.weekday() + 1) % 7  # 0=Sun
         days_in_month = cal_mod.monthrange(d.year, d.month)[1]
 
         # Get events and tasks for this month
@@ -1520,12 +1524,12 @@ class CalendarView(QWidget):
     def _render_week(self):
         t = self.theme
         d = self.current_date
-        # Find Monday of current week
-        monday = d - timedelta(days=d.weekday())
-        sunday = monday + timedelta(days=6)
-        self.date_label.setText(f"{monday.strftime('%b %d')} - {sunday.strftime('%b %d, %Y')}")
+        # Find Sunday of current week (week starts on Sunday)
+        sunday_start = d - timedelta(days=(d.weekday() + 1) % 7)
+        saturday_end = sunday_start + timedelta(days=6)
+        self.date_label.setText(f"{sunday_start.strftime('%b %d')} - {saturday_end.strftime('%b %d, %Y')}")
 
-        events = self.db.get_events_range(monday.isoformat(), sunday.isoformat())
+        events = self.db.get_events_range(sunday_start.isoformat(), saturday_end.isoformat())
         all_tasks = self.db.get_tasks()
 
         grid = QGridLayout()
@@ -1534,7 +1538,7 @@ class CalendarView(QWidget):
         # Time column + 7 day columns
         hours = list(range(7, 22))
         for col_idx in range(7):
-            day = monday + timedelta(days=col_idx)
+            day = sunday_start + timedelta(days=col_idx)
             is_today = day == date.today()
             header = QLabel(day.strftime("%a %d"))
             header.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1552,7 +1556,7 @@ class CalendarView(QWidget):
             grid.addWidget(time_lbl, row_idx + 1, 0)
 
             for col_idx in range(7):
-                day = monday + timedelta(days=col_idx)
+                day = sunday_start + timedelta(days=col_idx)
                 d_str = day.isoformat()
                 cell = QFrame()
                 cell.setMinimumHeight(36)
@@ -1772,6 +1776,10 @@ class SlashCommandMenu(QListWidget):
         ("Divider", "Horizontal rule", "divider"),
         ("Code Block", "Monospace code", "code"),
         ("Callout", "Highlighted callout box", "callout"),
+        ("Toggle", "Collapsible section", "toggle"),
+        ("Table of Contents", "Auto-generated TOC", "toc"),
+        ("Math Equation", "LaTeX formula", "math"),
+        ("Bookmark", "Embed a link", "bookmark"),
     ]
 
     def __init__(self, parent=None):
@@ -2310,6 +2318,14 @@ class RichTextEditor(QWidget):
             self._insert_code_block()
         elif cmd == "callout":
             self._insert_callout()
+        elif cmd == "toggle":
+            self._insert_toggle()
+        elif cmd == "toc":
+            self._insert_toc()
+        elif cmd == "math":
+            self._insert_math()
+        elif cmd == "bookmark":
+            self._insert_bookmark()
 
         self._slash_active = False
         self._slash_menu.hide()
@@ -2497,6 +2513,85 @@ class RichTextEditor(QWidget):
         char_fmt.setFontPointSize(13)
         cursor.insertBlock(block_fmt, char_fmt)
         cursor.insertText("\U0001F4A1 ")
+        self.editor.setTextCursor(cursor)
+
+    def _insert_toggle(self):
+        """Insert a toggle (collapsible) block using HTML in the rich text editor."""
+        cursor = self.editor.textCursor()
+        cursor.insertHtml(
+            '<div style="margin:8px 0;padding:6px 10px;background:#F7F6F3;border-radius:4px;">'
+            '<b>▶ Toggle heading</b><br>'
+            '<span style="color:#6B6B6B;margin-left:20px;">Toggle content — type here</span>'
+            '</div><br>'
+        )
+        self.editor.setTextCursor(cursor)
+
+    def _insert_toc(self):
+        """Insert a Table of Contents block based on current headings in the document."""
+        cursor = self.editor.textCursor()
+        doc = self.editor.document()
+        headings = []
+        block = doc.begin()
+        while block.isValid():
+            fmt = block.blockFormat()
+            text = block.text().strip()
+            if text:
+                # Check heading level by font size
+                cf = block.charFormat()
+                pt = cf.fontPointSize()
+                weight = cf.fontWeight()
+                if pt >= 20 or (weight and weight >= 700 and pt >= 16):
+                    headings.append(('h1', text))
+                elif pt >= 16 or (weight and weight >= 600 and pt >= 14):
+                    headings.append(('h2', text))
+                elif pt >= 14 and weight and weight >= 600:
+                    headings.append(('h3', text))
+            block = block.next()
+
+        toc_html = '<div style="background:#F7F6F3;border-radius:6px;padding:12px 16px;margin:8px 0;">'
+        toc_html += '<div style="font-size:11px;font-weight:600;color:#91918E;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Table of Contents</div>'
+        if headings:
+            for level, text in headings:
+                indent = '0' if level == 'h1' else ('16' if level == 'h2' else '32')
+                toc_html += f'<div style="padding:2px 0 2px {indent}px;font-size:13px;color:#2383E2;">{text}</div>'
+        else:
+            toc_html += '<div style="font-size:12px;color:#91918E;">No headings found yet.</div>'
+        toc_html += '</div><br>'
+        cursor.insertHtml(toc_html)
+        self.editor.setTextCursor(cursor)
+
+    def _insert_math(self):
+        """Insert a math formula block (rendered as styled text)."""
+        from PyQt6.QtWidgets import QInputDialog
+        formula, ok = QInputDialog.getText(self, "Math Equation", "LaTeX formula:", text="E = mc²")
+        if not ok or not formula:
+            return
+        cursor = self.editor.textCursor()
+        cursor.insertHtml(
+            f'<div style="background:#F7F6F3;border-radius:6px;padding:12px;margin:8px 0;text-align:center;'
+            f'font-family:serif;font-size:18px;font-style:italic;">{formula}</div><br>'
+        )
+        self.editor.setTextCursor(cursor)
+
+    def _insert_bookmark(self):
+        """Insert a bookmark/URL embed block."""
+        from PyQt6.QtWidgets import QInputDialog
+        url, ok = QInputDialog.getText(self, "Bookmark", "Paste URL:")
+        if not ok or not url.strip():
+            return
+        url = url.strip()
+        try:
+            from urllib.parse import urlparse
+            domain = urlparse(url).hostname or url
+        except Exception:
+            domain = url
+        cursor = self.editor.textCursor()
+        cursor.insertHtml(
+            f'<div style="border:1px solid #E3E2E0;border-radius:6px;padding:10px 14px;margin:8px 0;">'
+            f'<div style="font-size:13px;font-weight:500;">🔗 {domain}</div>'
+            f'<div style="font-size:11px;color:#91918E;">{url}</div>'
+            f'</div><br>'
+        )
         self.editor.setTextCursor(cursor)
 
     def _toggle_highlight(self):
@@ -2968,7 +3063,7 @@ class NoteItemWidget(QWidget):
     Handles special characters safely via Qt text rendering.
     Supports search highlight and tag chips.
     """
-    def __init__(self, title, preview, date_str, pinned=False, folder="", show_folder=False, is_active=False, theme=None, highlight="", tags=None, parent=None):
+    def __init__(self, title, preview, date_str, pinned=False, folder="", show_folder=False, is_active=False, theme=None, highlight="", tags=None, icon="", parent=None):
         super().__init__(parent)
         t = theme or LIGHT_THEME
         self.setFixedHeight(68)
@@ -2980,6 +3075,11 @@ class NoteItemWidget(QWidget):
         # Title line
         title_layout = QHBoxLayout()
         title_layout.setSpacing(4)
+        if icon:
+            icon_lbl = QLabel(icon)
+            icon_lbl.setStyleSheet("font-size: 14px; border: none; background: transparent;")
+            icon_lbl.setFixedWidth(18)
+            title_layout.addWidget(icon_lbl)
         if pinned:
             pin_lbl = QLabel("\u2605")
             pin_lbl.setStyleSheet("color: #F2994A; font-size: 11px; border: none; background: transparent;")
@@ -4031,6 +4131,7 @@ class NotesPage(QWidget):
                 theme=self.theme,
                 highlight=search,
                 tags=note_tags if note_tags else None,
+                icon=n.get("icon", ""),
             )
             self.note_list.setItemWidget(item, widget)
 
@@ -4188,6 +4289,7 @@ class NotesPage(QWidget):
                 note = self.db.conn.execute("SELECT pinned, folder, tags FROM notes WHERE id=?", (self.current_note_id,)).fetchone()
                 preview = self._get_plain_preview(content)
                 note_tags = [t.strip() for t in note["tags"].split(",") if t.strip()] if note and note["tags"] else []
+                note_icon = self.db.conn.execute("SELECT icon FROM notes WHERE id=?", (self.current_note_id,)).fetchone()
                 widget = NoteItemWidget(
                     title=display_title,
                     preview=preview,
@@ -4197,6 +4299,7 @@ class NotesPage(QWidget):
                     show_folder=self.current_folder is None and bool(note and note["folder"]),
                     theme=self.theme,
                     tags=note_tags if note_tags else None,
+                    icon=note_icon["icon"] if note_icon and note_icon["icon"] else "",
                 )
                 self.note_list.setItemWidget(item, widget)
                 break

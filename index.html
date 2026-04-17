@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <style>
         :root {
             --bg: #FFFFFF;
@@ -1804,6 +1806,79 @@
         /* Notes toast notification */
         .notes-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #37352F; color: white; padding: 10px 20px; border-radius: 8px; font-size: 13px; z-index: 10000; animation: slideDown 0.2s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
         body.dark .notes-toast { background: #E3E2E0; color: #191919; }
+
+        /* Toggle block */
+        .toggle-block { margin: 8px 0; border-radius: 4px; }
+        .toggle-header { display: flex; align-items: flex-start; gap: 4px; cursor: pointer; padding: 4px 0; user-select: none; }
+        .toggle-arrow { display: inline-block; width: 20px; height: 20px; text-align: center; line-height: 20px; font-size: 12px; transition: transform 0.2s ease; flex-shrink: 0; color: var(--text-dim, #91918E); border-radius: 3px; }
+        .toggle-arrow:hover { background: rgba(0,0,0,0.06); }
+        .toggle-block.open .toggle-arrow { transform: rotate(90deg); }
+        .toggle-title { flex: 1; min-width: 0; outline: none; font-weight: 500; }
+        .toggle-content { padding: 4px 0 4px 24px; display: none; min-height: 1.5em; outline: none; color: var(--text-dim, #6B6B6B); }
+        .toggle-block.open .toggle-content { display: block; }
+
+        /* Table of Contents */
+        .toc-block { background: var(--toolbar-bg, #F7F6F3); border-radius: 6px; padding: 16px 20px; margin: 12px 0; }
+        .toc-block-title { font-size: 13px; font-weight: 600; color: var(--text-dim, #91918E); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .toc-item { display: block; padding: 3px 0; font-size: 14px; color: #2383E2; cursor: pointer; text-decoration: none; transition: color 0.15s; }
+        .toc-item:hover { color: #1a6bc4; text-decoration: underline; }
+        .toc-item.toc-h2 { padding-left: 16px; }
+        .toc-item.toc-h3 { padding-left: 32px; font-size: 13px; }
+
+        /* Emoji icon */
+        .note-emoji-btn { font-size: 48px; cursor: pointer; border: none; background: none; padding: 0; margin: 0 0 4px; transition: transform 0.15s; line-height: 1; }
+        .note-emoji-btn:hover { transform: scale(1.15); }
+        .emoji-picker-popup { position: absolute; background: var(--editor-bg, #fff); border: 1px solid var(--border, #E3E2E0); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 12px; z-index: 1001; display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; max-height: 220px; overflow-y: auto; width: 280px; }
+        .emoji-picker-popup span { font-size: 22px; cursor: pointer; padding: 4px; border-radius: 6px; text-align: center; transition: background 0.1s; }
+        .emoji-picker-popup span:hover { background: rgba(0,0,0,0.06); }
+        body.dark .emoji-picker-popup { background: var(--card-bg); border-color: var(--border); }
+
+        /* Cover image */
+        .note-cover-img { width: 100%; height: 180px; object-fit: cover; border-radius: 0; cursor: pointer; transition: opacity 0.2s; }
+        .note-cover-img:hover { opacity: 0.9; }
+        .note-cover-placeholder { height: 36px; display: flex; align-items: center; justify-content: flex-end; padding-right: 12px; }
+        .note-cover-add-btn { font-size: 11px; color: var(--text-dim, #91918E); cursor: pointer; padding: 4px 10px; border-radius: 4px; border: none; background: transparent; opacity: 0; transition: opacity 0.2s; }
+        .note-editor:hover .note-cover-add-btn { opacity: 1; }
+        .note-cover-add-btn:hover { background: rgba(0,0,0,0.06); }
+
+        /* Mention / internal link */
+        .note-mention { color: #2383E2; background: rgba(35,131,226,0.08); padding: 1px 4px; border-radius: 3px; cursor: pointer; text-decoration: none; font-weight: 500; }
+        .note-mention:hover { background: rgba(35,131,226,0.16); }
+        .mention-popup { position: absolute; background: var(--editor-bg, #fff); border: 1px solid var(--border, #E3E2E0); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); padding: 6px 0; z-index: 1001; min-width: 200px; max-height: 200px; overflow-y: auto; }
+        .mention-item { padding: 6px 14px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; transition: background 0.1s; }
+        .mention-item:hover, .mention-item.active { background: rgba(35,131,226,0.08); }
+        body.dark .mention-popup { background: var(--card-bg); border-color: var(--border); }
+
+        /* Columns */
+        .note-columns { display: flex; gap: 16px; margin: 12px 0; }
+        .note-column { flex: 1; min-width: 0; padding: 8px; border: 1px dashed var(--border, #E3E2E0); border-radius: 6px; min-height: 60px; outline: none; }
+        .note-column:focus { border-color: #2383E2; border-style: solid; }
+
+        /* Math block */
+        .math-block { background: var(--toolbar-bg, #F7F6F3); border-radius: 6px; padding: 16px; margin: 12px 0; text-align: center; cursor: pointer; min-height: 40px; }
+        .math-block .katex { font-size: 1.2em; }
+        .math-block-editing { border: 2px solid #2383E2; }
+        .math-input { width: 100%; font-family: 'SF Mono', Consolas, monospace; font-size: 14px; border: none; background: transparent; outline: none; text-align: center; color: var(--text, #37352F); padding: 4px; }
+
+        /* Bookmark embed */
+        .bookmark-block { display: flex; border: 1px solid var(--border, #E3E2E0); border-radius: 6px; overflow: hidden; margin: 12px 0; cursor: pointer; transition: background 0.15s; text-decoration: none; color: inherit; }
+        .bookmark-block:hover { background: var(--card-hover, #F7F6F3); }
+        .bookmark-info { flex: 1; padding: 12px 16px; min-width: 0; }
+        .bookmark-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bookmark-desc { font-size: 12px; color: var(--text-dim, #91918E); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .bookmark-url { font-size: 11px; color: var(--text-dim, #B4B4B0); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* Backlinks */
+        .backlinks-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border, #E3E2E0); }
+        .backlinks-title { font-size: 12px; font-weight: 600; color: var(--text-dim, #91918E); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .backlink-item { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; margin: 2px 4px 2px 0; background: rgba(35,131,226,0.08); border-radius: 4px; font-size: 12px; color: #2383E2; cursor: pointer; transition: background 0.15s; }
+        .backlink-item:hover { background: rgba(35,131,226,0.16); }
+
+        /* Turn-into context menu */
+        .turn-into-menu { position: fixed; background: var(--editor-bg, #fff); border: 1px solid var(--border, #E3E2E0); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 6px 0; z-index: 1002; min-width: 180px; }
+        .turn-into-item { padding: 6px 14px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; transition: background 0.1s; color: var(--text, #37352F); }
+        .turn-into-item:hover { background: rgba(35,131,226,0.08); }
+        body.dark .turn-into-menu { background: var(--card-bg); border-color: var(--border); }
 
         /* Focus visible global for notes */
         .folder-chip:focus-visible, .notes-search:focus-visible { outline: 2px solid #2383E2; outline-offset: 2px; }
@@ -4123,10 +4198,17 @@
                 const pinBtn = currentNote.pinned ? '📌' : '☆';
                 const pinTitle = currentNote.pinned ? 'Unpin note' : 'Pin note';
 
+                const coverHtml = currentNote.cover
+                    ? `<div style="width:100%;height:180px;background:${currentNote.cover};cursor:pointer;position:relative;" onclick="addNoteCover(${safeId})"><button style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.4);color:white;border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;opacity:0;transition:opacity 0.2s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0">Change cover</button></div>`
+                    : `<div class="note-cover-placeholder"><button class="note-cover-add-btn" onclick="addNoteCover(${safeId})">&#128444; Add cover</button></div>`;
+                const noteIcon = currentNote.icon || '';
+                const emojiBtn = `<button class="note-emoji-btn" onclick="openEmojiPicker(${safeId})" title="Change icon">${noteIcon || '<span style="font-size:32px;opacity:0.3;">&#128513;</span>'}</button>`;
+
                 editorHtml = `<div class="note-editor" role="main" aria-label="Note editor">
-                    <div class="note-cover-bar"></div>
+                    ${coverHtml}
                     <div class="note-editor-inner">
                         <div class="note-breadcrumb">${breadcrumb}</div>
+                        ${emojiBtn}
                         <div class="note-title-row">
                             <button class="notes-mobile-toggle" onclick="toggleNotesSidebar()" aria-label="Toggle notes sidebar" tabindex="0">&#9776;</button>
                             <input class="note-title-input" value="${(currentNote.title || '').replace(/"/g, '&quot;')}"
@@ -4136,6 +4218,9 @@
                         </div>
                         ${renderTagsBar(currentNote)}
                         <div class="note-toolbar" role="toolbar" aria-label="Formatting toolbar">
+                            <button onclick="noteUndo()" title="Undo (Ctrl+Z)" aria-label="Undo" tabindex="0">&#8617;</button>
+                            <button onclick="noteRedo()" title="Redo (Ctrl+Y)" aria-label="Redo" tabindex="0">&#8618;</button>
+                            <div class="toolbar-sep"></div>
                             <button onclick="noteExec('bold')" title="Bold" aria-label="Bold" tabindex="0"><b>B</b></button>
                             <button onclick="noteExec('italic')" title="Italic" aria-label="Italic" tabindex="0"><i>I</i></button>
                             <button onclick="noteExec('underline')" title="Underline" aria-label="Underline" tabindex="0"><u>U</u></button>
@@ -4154,7 +4239,12 @@
                             <button onclick="noteInsertCallout()" title="Callout" aria-label="Callout block" tabindex="0">&#128161;</button>
                             <button onclick="noteInsertChecklist()" title="Checklist" aria-label="Checklist" tabindex="0">&#9745;</button>
                             <button onclick="noteInsertTable()" title="Table" aria-label="Insert table" tabindex="0">&#128202;</button>
+                            <button onclick="noteInsertToggle()" title="Toggle Block" aria-label="Toggle block" tabindex="0">&#9654;</button>
+                            <button onclick="noteInsertColumns()" title="Columns" aria-label="Columns" tabindex="0">&#9868;</button>
+                            <button onclick="noteInsertMath()" title="Math Equation" aria-label="Math equation" tabindex="0">&#8721;</button>
+                            <button onclick="noteInsertBookmark()" title="Bookmark" aria-label="Bookmark embed" tabindex="0">&#128278;</button>
                             <button onclick="noteInsertLink()" title="Insert Link (Ctrl+K)" aria-label="Insert link" tabindex="0">&#128279;</button>
+                            <button onclick="showTurnIntoMenu()" title="Turn Into..." aria-label="Turn into" tabindex="0">&#8634;</button>
                             <div class="toolbar-sep"></div>
                             <button onclick="noteSetColor('#37352F')" title="Default"><span class="toolbar-color" style="background:#37352F;display:inline-block;"></span></button>
                             <button onclick="noteSetColor('#EB5757')" title="Red"><span class="toolbar-color" style="background:#EB5757;display:inline-block;"></span></button>
@@ -4192,6 +4282,7 @@
                             <span>${createdDisplay ? 'Created ' + createdDisplay : ''}</span>
                             <span>${updatedDisplay ? 'Updated ' + updatedDisplay : ''}</span>
                         </div>
+                        ${renderBacklinks(currentNote.id)}
                     </div>
                 </div>`;
             } else {
@@ -4331,7 +4422,7 @@
                 ondragstart="noteDragStart(event,${idx})" ondragover="noteDragOver(event)" ondragleave="noteDragLeave(event)" ondrop="noteDrop(event,${idx})"
                 onkeydown="if(event.key==='Enter')selectNote(${safeId})">
                 <span class="note-item-handle">⠿</span>
-                <div class="note-item-title">${pinStar}${safeTitle}</div>
+                <div class="note-item-title">${pinStar}${n.icon ? '<span style="margin-right:4px;">'+n.icon+'</span>' : ''}${safeTitle}</div>
                 <div class="note-item-preview">${escapeHtml(preview || 'Empty note')}</div>
                 <div class="note-item-bottom">${folderTag}${itemTags}<span class="note-item-date">${relDate}</span></div>
             </div>`;
@@ -4442,6 +4533,9 @@
                 folder: currentNoteFolder || '',
                 tags: [],
                 font: 'sans',
+                icon: '',
+                cover: '',
+                coverType: '',
                 sort_order: 0,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
@@ -4641,6 +4735,345 @@
             setTimeout(() => { if (toast.parentNode) toast.remove(); }, duration);
         }
 
+        // ── Toggle block ──
+        function noteInsertToggle() {
+            const editor = document.getElementById('noteContentEditable');
+            if (!editor) return;
+            const html = `<div class="toggle-block open" contenteditable="false">
+                <div class="toggle-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span class="toggle-arrow">&#9654;</span>
+                    <span class="toggle-title" contenteditable="true" data-placeholder="Toggle title...">Toggle heading</span>
+                </div>
+                <div class="toggle-content" contenteditable="true" data-placeholder="Empty toggle. Click to add content.">Type inside...</div>
+            </div><p><br></p>`;
+            document.execCommand('insertHTML', false, html);
+        }
+
+        // ── Table of Contents ──
+        function noteInsertTOC() {
+            const editor = document.getElementById('noteContentEditable');
+            if (!editor) return;
+            const headings = editor.querySelectorAll('h1, h2, h3');
+            let tocHtml = '<div class="toc-block" contenteditable="false"><div class="toc-block-title">Table of Contents</div>';
+            if (headings.length === 0) {
+                tocHtml += '<div style="color:var(--text-dim,#91918E);font-size:13px;">No headings found. Add headings (H1, H2, H3) to generate a table of contents.</div>';
+            } else {
+                headings.forEach((h, i) => {
+                    const level = h.tagName.toLowerCase();
+                    const text = h.textContent.trim() || 'Untitled';
+                    const id = 'toc-heading-' + i;
+                    h.id = id;
+                    tocHtml += `<a class="toc-item toc-${level}" onclick="document.getElementById('${id}').scrollIntoView({behavior:'smooth'})">${text}</a>`;
+                });
+            }
+            tocHtml += '</div><p><br></p>';
+            document.execCommand('insertHTML', false, tocHtml);
+        }
+
+        // ── Emoji icon picker ──
+        const NOTE_EMOJIS = ['📝','📓','📒','📕','📗','📘','📙','📔','📖','💡','🎯','🔥','⭐','❤️','🚀','💼','🎨','🎵','📸','🌟','✅','💪','🧠','📌','🏠','🌈','🎬','📊','🔧','⚡','🌍','🎉','💻','📱','🔑','🌺','☕','🍎','🎓','🏆','💎','🌙','🎁','📅','🔍','🖊️','💬','🧩','🌿','🎈'];
+
+        function openEmojiPicker(noteId) {
+            closeEmojiPicker();
+            const btn = document.querySelector('.note-emoji-btn');
+            if (!btn) return;
+            const rect = btn.getBoundingClientRect();
+            const picker = document.createElement('div');
+            picker.className = 'emoji-picker-popup';
+            picker.id = 'emojiPickerPopup';
+            picker.style.position = 'fixed';
+            picker.style.top = (rect.bottom + 4) + 'px';
+            picker.style.left = rect.left + 'px';
+            // Remove emoji option
+            const removeBtn = document.createElement('span');
+            removeBtn.textContent = '✕';
+            removeBtn.title = 'Remove icon';
+            removeBtn.style.fontSize = '16px';
+            removeBtn.style.color = 'var(--text-dim,#91918E)';
+            removeBtn.onclick = () => { setNoteEmoji(noteId, ''); closeEmojiPicker(); };
+            picker.appendChild(removeBtn);
+            NOTE_EMOJIS.forEach(em => {
+                const s = document.createElement('span');
+                s.textContent = em;
+                s.onclick = () => { setNoteEmoji(noteId, em); closeEmojiPicker(); };
+                picker.appendChild(s);
+            });
+            document.body.appendChild(picker);
+            setTimeout(() => document.addEventListener('click', _emojiOutsideClick), 10);
+        }
+        function _emojiOutsideClick(e) {
+            const picker = document.getElementById('emojiPickerPopup');
+            if (picker && !picker.contains(e.target) && !e.target.classList.contains('note-emoji-btn')) closeEmojiPicker();
+        }
+        function closeEmojiPicker() {
+            const picker = document.getElementById('emojiPickerPopup');
+            if (picker) picker.remove();
+            document.removeEventListener('click', _emojiOutsideClick);
+        }
+        function setNoteEmoji(noteId, emoji) {
+            const note = notesData.notes.find(n => n.id === noteId);
+            if (note) { note.icon = emoji; saveNotesData(); renderNotes(); }
+        }
+
+        // ── Cover image ──
+        function addNoteCover(noteId) {
+            const note = notesData.notes.find(n => n.id === noteId);
+            if (!note) return;
+            const coverOptions = [
+                { name: 'Gradient Blue', url: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', type: 'gradient' },
+                { name: 'Gradient Warm', url: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', type: 'gradient' },
+                { name: 'Gradient Green', url: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', type: 'gradient' },
+                { name: 'Gradient Sunset', url: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', type: 'gradient' },
+                { name: 'Gradient Ocean', url: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)', type: 'gradient' },
+                { name: 'Gradient Night', url: 'linear-gradient(135deg, #0c3483 0%, #a2b6df 100%)', type: 'gradient' },
+                { name: 'Gradient Mint', url: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', type: 'gradient' },
+                { name: 'Gradient Fire', url: 'linear-gradient(135deg, #f83600 0%, #f9d423 100%)', type: 'gradient' },
+            ];
+            // Build modal
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:10000;display:flex;align-items:center;justify-content:center;';
+            const thm = THEMES[currentTheme] || THEMES['Light'];
+            const modal = document.createElement('div');
+            modal.style.cssText = `background:${thm.cardBg||thm.bg};color:${thm.text};border-radius:12px;padding:24px;min-width:340px;max-width:400px;box-shadow:0 16px 40px rgba(0,0,0,0.2);`;
+            modal.innerHTML = `<h3 style="margin:0 0 16px;font-size:16px;">Choose Cover</h3>
+                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;" id="coverGrid"></div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                    ${note.cover ? '<button id="removeCoverBtn" style="margin-right:auto;padding:8px 16px;border:1px solid #e2445c;background:transparent;color:#e2445c;border-radius:8px;cursor:pointer;">Remove</button>' : ''}
+                    <button id="cancelCoverBtn" style="padding:8px 16px;border:1px solid ${thm.border};background:transparent;color:${thm.text};border-radius:8px;cursor:pointer;">Cancel</button>
+                </div>`;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+            const grid = modal.querySelector('#coverGrid');
+            coverOptions.forEach(opt => {
+                const item = document.createElement('div');
+                item.style.cssText = `height:60px;border-radius:8px;cursor:pointer;background:${opt.url};transition:transform 0.15s,box-shadow 0.15s;`;
+                item.title = opt.name;
+                item.onmouseenter = () => { item.style.transform='scale(1.05)'; item.style.boxShadow='0 4px 12px rgba(0,0,0,0.2)'; };
+                item.onmouseleave = () => { item.style.transform=''; item.style.boxShadow=''; };
+                item.onclick = () => { note.cover = opt.url; note.coverType = opt.type; saveNotesData(); renderNotes(); overlay.remove(); };
+                grid.appendChild(item);
+            });
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+            modal.querySelector('#cancelCoverBtn').onclick = () => overlay.remove();
+            if (note.cover) modal.querySelector('#removeCoverBtn').onclick = () => { note.cover = ''; note.coverType = ''; saveNotesData(); renderNotes(); overlay.remove(); };
+        }
+
+        // ── Mention / internal link ──
+        let mentionPopup = null, mentionIndex = 0, mentionFiltered = [];
+        function showMentionPopup() {
+            closeMentionPopup();
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            const range = sel.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            const editorEl = document.getElementById('noteContentEditable');
+            if (!editorEl) return;
+            const editorRect = editorEl.getBoundingClientRect();
+            mentionPopup = document.createElement('div');
+            mentionPopup.className = 'mention-popup';
+            mentionPopup.style.position = 'absolute';
+            mentionPopup.style.top = (rect.bottom - editorRect.top + editorEl.scrollTop + 4) + 'px';
+            mentionPopup.style.left = (rect.left - editorRect.left) + 'px';
+            mentionFiltered = notesData.notes.filter(n => n.id !== currentNoteId).map(n => ({ id: n.id, title: n.title || 'Untitled', icon: n.icon || '📝' }));
+            mentionIndex = 0;
+            renderMentionItems('');
+            editorEl.style.position = 'relative';
+            editorEl.appendChild(mentionPopup);
+        }
+        function renderMentionItems(query) {
+            if (!mentionPopup) return;
+            const q = query.toLowerCase();
+            mentionFiltered = notesData.notes.filter(n => n.id !== currentNoteId && (n.title || 'Untitled').toLowerCase().includes(q)).map(n => ({ id: n.id, title: n.title || 'Untitled', icon: n.icon || '📝' }));
+            mentionPopup.innerHTML = '';
+            if (mentionFiltered.length === 0) {
+                mentionPopup.innerHTML = '<div class="mention-item" style="color:#91918E;">No matching notes</div>';
+                return;
+            }
+            mentionFiltered.forEach((n, i) => {
+                const item = document.createElement('div');
+                item.className = 'mention-item' + (i === mentionIndex ? ' active' : '');
+                item.innerHTML = `<span>${n.icon}</span><span>${escapeHtml(n.title)}</span>`;
+                item.onclick = () => insertMention(n);
+                item.onmouseenter = () => { mentionIndex = i; updateMentionHighlight(); };
+                mentionPopup.appendChild(item);
+            });
+        }
+        function updateMentionHighlight() {
+            if (!mentionPopup) return;
+            mentionPopup.querySelectorAll('.mention-item').forEach((el, i) => el.classList.toggle('active', i === mentionIndex));
+        }
+        function insertMention(noteRef) {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+                const range = sel.getRangeAt(0);
+                const node = range.startContainer;
+                if (node.nodeType === 3) {
+                    const text = node.textContent;
+                    const atPos = text.lastIndexOf('@');
+                    if (atPos >= 0) {
+                        node.textContent = text.substring(0, atPos) + text.substring(range.startOffset);
+                        const newRange = document.createRange();
+                        newRange.setStart(node, Math.min(atPos, node.textContent.length));
+                        newRange.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(newRange);
+                    }
+                }
+            }
+            const mentionHtml = `<a class="note-mention" data-note-id="${noteRef.id}" onclick="selectNote(${noteRef.id})" contenteditable="false">${noteRef.icon} ${escapeHtml(noteRef.title)}</a>&nbsp;`;
+            document.execCommand('insertHTML', false, mentionHtml);
+            closeMentionPopup();
+        }
+        function closeMentionPopup() {
+            if (mentionPopup && mentionPopup.parentNode) mentionPopup.parentNode.removeChild(mentionPopup);
+            mentionPopup = null; mentionIndex = 0;
+        }
+
+        // ── Turn Into (block type conversion) ──
+        let turnIntoMenu = null;
+        function showTurnIntoMenu() {
+            closeTurnIntoMenu();
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            const range = sel.getRangeAt(0);
+            let block = range.startContainer;
+            while (block && block.nodeType === 3) block = block.parentNode;
+            if (!block) return;
+            // Walk up to find direct child of editor
+            const editor = document.getElementById('noteContentEditable');
+            while (block && block.parentNode !== editor) block = block.parentNode;
+            if (!block || block === editor) return;
+
+            const rect = block.getBoundingClientRect();
+            turnIntoMenu = document.createElement('div');
+            turnIntoMenu.className = 'turn-into-menu';
+            turnIntoMenu.style.top = rect.top + 'px';
+            turnIntoMenu.style.left = (rect.left - 190) + 'px';
+            if (rect.left < 200) turnIntoMenu.style.left = (rect.right + 8) + 'px';
+            const types = [
+                { icon: 'P', label: 'Text', tag: 'p' },
+                { icon: 'H1', label: 'Heading 1', tag: 'h1' },
+                { icon: 'H2', label: 'Heading 2', tag: 'h2' },
+                { icon: 'H3', label: 'Heading 3', tag: 'h3' },
+                { icon: '•', label: 'Bullet List', action: () => { closeTurnIntoMenu(); noteExec('insertUnorderedList'); } },
+                { icon: '1.', label: 'Numbered List', action: () => { closeTurnIntoMenu(); noteExec('insertOrderedList'); } },
+                { icon: '❝', label: 'Quote', action: () => { closeTurnIntoMenu(); noteInsertQuote(); } },
+                { icon: '</>', label: 'Code Block', action: () => { closeTurnIntoMenu(); noteInsertCodeBlock(); } },
+            ];
+            types.forEach(t => {
+                const item = document.createElement('div');
+                item.className = 'turn-into-item';
+                item.innerHTML = `<span style="width:24px;text-align:center;font-weight:600;font-size:12px;">${t.icon}</span><span>${t.label}</span>`;
+                item.onclick = () => {
+                    if (t.action) { t.action(); return; }
+                    // Convert block tag
+                    const newEl = document.createElement(t.tag);
+                    newEl.innerHTML = block.innerHTML;
+                    block.parentNode.replaceChild(newEl, block);
+                    closeTurnIntoMenu();
+                    // Place cursor in new element
+                    const r = document.createRange();
+                    r.selectNodeContents(newEl);
+                    r.collapse(false);
+                    sel.removeAllRanges();
+                    sel.addRange(r);
+                };
+                turnIntoMenu.appendChild(item);
+            });
+            document.body.appendChild(turnIntoMenu);
+            setTimeout(() => document.addEventListener('click', _turnIntoOutsideClick), 10);
+        }
+        function _turnIntoOutsideClick(e) {
+            if (turnIntoMenu && !turnIntoMenu.contains(e.target)) closeTurnIntoMenu();
+        }
+        function closeTurnIntoMenu() {
+            if (turnIntoMenu) turnIntoMenu.remove();
+            turnIntoMenu = null;
+            document.removeEventListener('click', _turnIntoOutsideClick);
+        }
+
+        // ── Columns ──
+        function noteInsertColumns() {
+            const cols = prompt('Number of columns (2-4):', '2');
+            const num = parseInt(cols);
+            if (!num || num < 2 || num > 4) return;
+            let colsHtml = '<div class="note-columns" contenteditable="false">';
+            for (let i = 0; i < num; i++) {
+                colsHtml += `<div class="note-column" contenteditable="true" data-placeholder="Column ${i+1}..."></div>`;
+            }
+            colsHtml += '</div><p><br></p>';
+            document.execCommand('insertHTML', false, colsHtml);
+        }
+
+        // ── Math formula (KaTeX) ──
+        function noteInsertMath() {
+            const formula = prompt('LaTeX formula:', 'E = mc^2');
+            if (!formula) return;
+            let rendered = formula;
+            try {
+                if (typeof katex !== 'undefined') rendered = katex.renderToString(formula, { throwOnError: false, displayMode: true });
+            } catch(e) { /* fallback to raw */ }
+            const html = `<div class="math-block" contenteditable="false" data-formula="${escapeHtml(formula)}" ondblclick="editMathBlock(this)">${rendered}</div><p><br></p>`;
+            document.execCommand('insertHTML', false, html);
+        }
+        function editMathBlock(el) {
+            const oldFormula = el.getAttribute('data-formula') || '';
+            const newFormula = prompt('Edit LaTeX formula:', oldFormula);
+            if (newFormula === null) return;
+            if (newFormula === '') { el.remove(); return; }
+            el.setAttribute('data-formula', newFormula);
+            try {
+                if (typeof katex !== 'undefined') el.innerHTML = katex.renderToString(newFormula, { throwOnError: false, displayMode: true });
+                else el.textContent = newFormula;
+            } catch(e) { el.textContent = newFormula; }
+            // Trigger content save
+            if (typeof debouncedUpdateNoteContent === 'function') debouncedUpdateNoteContent(currentNoteId);
+        }
+
+        // ── Bookmark embed ──
+        function noteInsertBookmark() {
+            const url = prompt('Paste URL:');
+            if (!url || !url.trim()) return;
+            const cleanUrl = url.trim();
+            let domain = '';
+            try { domain = new URL(cleanUrl).hostname; } catch(e) { domain = cleanUrl; }
+            const html = `<a class="bookmark-block" href="${escapeHtml(cleanUrl)}" target="_blank" rel="noopener" contenteditable="false">
+                <div class="bookmark-info">
+                    <div class="bookmark-title">${escapeHtml(domain)}</div>
+                    <div class="bookmark-desc">${escapeHtml(cleanUrl)}</div>
+                    <div class="bookmark-url">🔗 ${escapeHtml(cleanUrl)}</div>
+                </div>
+            </a><p><br></p>`;
+            document.execCommand('insertHTML', false, html);
+        }
+
+        // ── Undo / Redo ──
+        function noteUndo() { document.execCommand('undo'); }
+        function noteRedo() { document.execCommand('redo'); }
+
+        // ── Backlinks ──
+        function getBacklinks(noteId) {
+            const links = [];
+            notesData.notes.forEach(n => {
+                if (n.id === noteId) return;
+                if (n.content && n.content.includes('data-note-id="' + noteId + '"')) {
+                    links.push({ id: n.id, title: n.title || 'Untitled', icon: n.icon || '📝' });
+                }
+            });
+            return links;
+        }
+
+        function renderBacklinks(noteId) {
+            const links = getBacklinks(noteId);
+            if (links.length === 0) return '';
+            let html = '<div class="backlinks-section"><div class="backlinks-title">🔗 ' + links.length + ' Backlink' + (links.length > 1 ? 's' : '') + '</div>';
+            links.forEach(l => {
+                html += `<span class="backlink-item" onclick="selectNote(${l.id})">${l.icon} ${escapeHtml(l.title)}</span>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
         // ── Notes formatting helpers ──
         function noteExec(cmd, showUI, value) {
             const el = document.getElementById('noteContentEditable');
@@ -4724,6 +5157,12 @@
             { icon: '&#128161;', label: 'Callout', desc: 'Callout box', action: () => noteInsertCallout() },
             { icon: '&#9745;', label: 'To-do List', desc: 'Checklist item', action: () => noteInsertChecklist() },
             { icon: '&#128202;', label: 'Table', desc: 'Insert a table', action: () => noteInsertTable() },
+            { icon: '&#9654;', label: 'Toggle', desc: 'Collapsible section', action: () => noteInsertToggle() },
+            { icon: '&#128209;', label: 'Table of Contents', desc: 'Auto-generated TOC', action: () => noteInsertTOC() },
+            { icon: '&#9868;', label: 'Columns', desc: 'Multi-column layout', action: () => noteInsertColumns() },
+            { icon: '&#8721;', label: 'Math Equation', desc: 'LaTeX formula', action: () => noteInsertMath() },
+            { icon: '&#128278;', label: 'Bookmark', desc: 'Embed a link', action: () => noteInsertBookmark() },
+            { icon: '@', label: 'Mention', desc: 'Link to another note', action: () => showMentionPopup() },
         ];
 
         function noteKeyHandler(event, noteId) {
@@ -4796,6 +5235,33 @@
             if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
                 event.preventDefault();
                 noteInsertLink();
+            }
+            // Ctrl+Z / Cmd+Z: undo, Ctrl+Shift+Z / Cmd+Shift+Z: redo
+            // (browser native, but we ensure it works)
+
+            // @ mention popup
+            if (event.key === '@' && !event.ctrlKey && !event.metaKey) {
+                setTimeout(() => showMentionPopup(), 10);
+            }
+            // Handle mention popup navigation
+            if (mentionPopup) {
+                if (event.key === 'ArrowDown') { event.preventDefault(); mentionIndex = (mentionIndex + 1) % Math.max(mentionFiltered.length,1); updateMentionHighlight(); return; }
+                if (event.key === 'ArrowUp') { event.preventDefault(); mentionIndex = (mentionIndex - 1 + mentionFiltered.length) % Math.max(mentionFiltered.length,1); updateMentionHighlight(); return; }
+                if (event.key === 'Enter' && mentionFiltered.length > 0) { event.preventDefault(); insertMention(mentionFiltered[mentionIndex]); return; }
+                if (event.key === 'Escape') { event.preventDefault(); closeMentionPopup(); return; }
+                if (event.key === 'Backspace' || (event.key.length === 1 && !event.ctrlKey && !event.metaKey)) {
+                    setTimeout(() => {
+                        const sel = window.getSelection();
+                        if (!sel || sel.rangeCount === 0) { closeMentionPopup(); return; }
+                        const range = sel.getRangeAt(0);
+                        const node = range.startContainer;
+                        const text = node.textContent || '';
+                        const atPos = text.lastIndexOf('@');
+                        if (atPos < 0) { closeMentionPopup(); return; }
+                        const query = text.substring(atPos + 1, range.startOffset);
+                        renderMentionItems(query);
+                    }, 0);
+                }
             }
         }
 

@@ -2122,9 +2122,12 @@
             <input type="text" class="search-box" id="searchBox" placeholder="Search tasks...">
             <div class="toolbar">
                 <button class="btn btn-secondary" id="newTaskBtn">+ New Task</button>
-                <button class="btn btn-secondary" id="syncBtn">
+                <button class="btn btn-secondary" id="syncBtn" title="Quick Sync: tasks + events only">
                     <span class="sync-indicator synced" id="syncIndicator"></span>
                     Sync
+                </button>
+                <button class="btn btn-secondary" id="fullSyncBtn" title="Full Sync: tasks + events + notes content" style="padding:6px 10px;">
+                    Full Sync
                 </button>
                 <button class="btn btn-secondary" id="expandAllBtn">Expand All</button>
                 <button class="btn btn-secondary" id="collapseAllBtn">Collapse All</button>
@@ -2430,7 +2433,7 @@
 
             setupEventListeners();
             renderApp();
-            syncData();
+            syncData('quick');
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -2444,7 +2447,8 @@
 
         function setupEventListeners() {
             document.getElementById('newTaskBtn').addEventListener('click', addNewTask);
-            document.getElementById('syncBtn').addEventListener('click', syncData);
+            document.getElementById('syncBtn').addEventListener('click', () => syncData('quick'));
+            document.getElementById('fullSyncBtn').addEventListener('click', () => syncData('full'));
             document.getElementById('expandAllBtn').addEventListener('click', expandAll);
             document.getElementById('collapseAllBtn').addEventListener('click', collapseAll);
             document.getElementById('exportBtn').addEventListener('click', exportJSON);
@@ -2463,16 +2467,19 @@
             setTheme(darkMode ? 'light' : 'dark');
         }
 
-        async function syncData() {
+        async function syncData(mode = 'quick') {
+            const isFull = mode === 'full';
             updateSyncIndicator('syncing');
             try {
                 // Push local data first, then pull
                 const localTaskCount = appData.groups.flatMap(g => g.tasks).length;
                 if (localTaskCount > 0 || calendarData.events.length > 0 || notesData.notes.length > 0) {
-                    await pushSync();
+                    await pushSync(isFull);
                 }
 
-                const response = await fetch(getAuthUrl('getTasks'));
+                // Quick uses getTasksLight (no note content), Full uses getTasks
+                const endpoint = isFull ? 'getTasks' : 'getTasksLight';
+                const response = await fetch(getAuthUrl(endpoint));
                 const data = await response.json();
                 if (data.error && data.code === 401) { doLogout(); return; }
 
@@ -2528,21 +2535,30 @@
                 }
                 // Sync notes
                 if (data.notes) {
-                    const serverNotes = data.notes.map(n => ({
-                        id: n.id || ('note_' + Date.now() + '_' + Math.random().toString(36).substr(2,5)),
-                        title: n.title || 'Untitled',
-                        content: n.content || '',
-                        pinned: n.pinned || false,
-                        folder: n.folder || '',
-                        tags: Array.isArray(n.tags) ? n.tags : [],
-                        font: n.font || 'sans',
-                        icon: n.icon || '',
-                        cover: n.cover || '',
-                        coverType: n.coverType || '',
-                        sort_order: n.sort_order || n.sortOrder || 0,
-                        created_at: n.createdAt || n.created_at || new Date().toISOString(),
-                        updated_at: n.updatedAt || n.updated_at || new Date().toISOString()
-                    }));
+                    const localNoteMap = {};
+                    notesData.notes.forEach(n => { localNoteMap[String(n.id)] = n; });
+
+                    const serverNotes = data.notes.map(n => {
+                        const nid = n.id || ('note_' + Date.now() + '_' + Math.random().toString(36).substr(2,5));
+                        const localNote = localNoteMap[String(nid)];
+                        // Quick sync: server has no content → keep local content
+                        const content = (n.content !== undefined && n.content !== '') ? n.content : (localNote ? localNote.content : '');
+                        return {
+                            id: nid,
+                            title: n.title || 'Untitled',
+                            content: content,
+                            pinned: n.pinned || false,
+                            folder: n.folder || '',
+                            tags: Array.isArray(n.tags) ? n.tags : [],
+                            font: n.font || 'sans',
+                            icon: n.icon || '',
+                            cover: n.cover || '',
+                            coverType: n.coverType || '',
+                            sort_order: n.sort_order || n.sortOrder || 0,
+                            created_at: n.createdAt || n.created_at || new Date().toISOString(),
+                            updated_at: n.updatedAt || n.updated_at || new Date().toISOString()
+                        };
+                    });
                     // Merge: server wins for shared IDs, but keep local-only notes
                     const serverNoteIds = new Set(serverNotes.map(n => String(n.id)));
                     const localOnlyNotes = notesData.notes.filter(n => !serverNoteIds.has(String(n.id)));
@@ -2566,10 +2582,10 @@
         function debouncedSync() {
             saveLocalData();
             clearTimeout(syncTimeout);
-            syncTimeout = setTimeout(() => { pushSync(); }, 2000);
+            syncTimeout = setTimeout(() => { pushSync(false); }, 2000);
         }
 
-        async function pushSync() {
+        async function pushSync(includeNotes = false) {
             try {
                 const pushData = {
                     action: 'syncAll',
@@ -2582,8 +2598,15 @@
                         color: ev.color || '#0073ea', allDay: ev.all_day || false,
                         description: ev.description || ''
                     })),
-                    notes: notesData.notes.map(n => ({
+                    notes: includeNotes ? notesData.notes.map(n => ({
                         id: n.id, title: n.title, content: n.content || '',
+                        pinned: n.pinned || false,
+                        folder: n.folder || '', tags: n.tags || [], font: n.font || 'sans',
+                        icon: n.icon || '', cover: n.cover || '', coverType: n.coverType || '',
+                        sortOrder: n.sort_order || 0,
+                        createdAt: n.created_at || '', updatedAt: n.updated_at || ''
+                    })) : notesData.notes.map(n => ({
+                        id: n.id, title: n.title,
                         pinned: n.pinned || false,
                         folder: n.folder || '', tags: n.tags || [], font: n.font || 'sans',
                         icon: n.icon || '', cover: n.cover || '', coverType: n.coverType || '',

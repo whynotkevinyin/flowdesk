@@ -1271,18 +1271,25 @@ class EventEditDialog(QDialog):
 
         layout.addLayout(form)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self._save)
-        buttons.rejected.connect(self.reject)
-
+        btn_row = QHBoxLayout()
         if event_id:
-            del_btn = buttons.addButton("Delete", QDialogButtonBox.ButtonRole.DestructiveRole)
-            del_btn.setStyleSheet("color: #e2445c;")
+            del_btn = QPushButton("Delete")
+            del_btn.setStyleSheet("color: #e2445c; padding: 6px 16px;")
+            del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             del_btn.clicked.connect(self._delete)
-
-        layout.addWidget(buttons)
+            btn_row.addWidget(del_btn)
+        btn_row.addStretch()
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setStyleSheet("padding: 6px 16px;")
+        cancel_btn.clicked.connect(self.reject)
+        btn_row.addWidget(cancel_btn)
+        save_btn = QPushButton("Save")
+        save_btn.setStyleSheet("padding: 6px 20px; background: #0073ea; color: white; border: none; border-radius: 6px; font-weight: bold;")
+        save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        save_btn.clicked.connect(self._save)
+        save_btn.setDefault(True)
+        btn_row.addWidget(save_btn)
+        layout.addLayout(btn_row)
         self._toggle_time()
 
     def _set_color(self, color):

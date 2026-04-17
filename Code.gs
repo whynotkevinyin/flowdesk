@@ -1,5 +1,5 @@
 // ============================================================
-// Code.gs — Flowdesk Backend API (v6 - Drive Notes + Google Calendar Sync)
+// Code.gs — Flowdesk Backend API (v9 - time format fix + description sync)
 // ============================================================
 // Notes content → Google Drive files (no 50K limit)
 // Events ↔ Google Calendar (bidirectional sync)
@@ -230,29 +230,33 @@ function initSheet() {
     membersSheet.appendRow(['Kevin']);
   }
 
-  // Events sheet — v6: added gcalId column (10)
+  // Events sheet — v9: added description column (11)
   let eventsSheet = ss.getSheetByName('Events');
   if (!eventsSheet) {
     eventsSheet = ss.insertSheet('Events');
-    eventsSheet.appendRow(['id','title','date','startTime','endTime','color','allDay','createdAt','updatedAt','gcalId']);
-    eventsSheet.getRange(1,1,1,10).setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
+    eventsSheet.appendRow(['id','title','date','startTime','endTime','color','allDay','createdAt','updatedAt','gcalId','description']);
+    eventsSheet.getRange(1,1,1,11).setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
     eventsSheet.setFrozenRows(1);
-    eventsSheet.setColumnWidths(1,10,140);
+    eventsSheet.setColumnWidths(1,11,140);
   } else {
-    // Migrate: add gcalId header if missing
-    const headers = eventsSheet.getRange(1,1,1,10).getValues()[0];
+    // Migrate: add gcalId header if missing (col 10), description (col 11)
+    const lastCol = Math.max(eventsSheet.getLastColumn(), 10);
+    const headers = eventsSheet.getRange(1,1,1,lastCol).getValues()[0];
     if (headers[9] !== 'gcalId') {
       eventsSheet.getRange(1,10).setValue('gcalId').setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
+    }
+    if (lastCol < 11 || headers[10] !== 'description') {
+      eventsSheet.getRange(1,11).setValue('description').setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
     }
   }
 
   let notesSheet = ss.getSheetByName('Notes');
   if (!notesSheet) {
     notesSheet = ss.insertSheet('Notes');
-    notesSheet.appendRow(['id','title','driveFileId','pinned','folder','sortOrder','createdAt','updatedAt']);
-    notesSheet.getRange(1,1,1,8).setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
+    notesSheet.appendRow(['id','title','driveFileId','pinned','folder','sortOrder','createdAt','updatedAt','tags','font','icon','cover']);
+    notesSheet.getRange(1,1,1,12).setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
     notesSheet.setFrozenRows(1);
-    notesSheet.setColumnWidths(1,8,140);
+    notesSheet.setColumnWidths(1,12,140);
   }
 
   const sheet1 = ss.getSheetByName('Sheet1');
@@ -308,16 +312,17 @@ function getAllData() {
   const events = [];
   const sheetEventIds = new Set();
   if (eventsSheet && eventsSheet.getLastRow() > 1) {
-    const cols = Math.min(eventsSheet.getLastColumn(), 10);
+    const cols = Math.min(eventsSheet.getLastColumn(), 11);
     const eData = eventsSheet.getRange(2,1,eventsSheet.getLastRow()-1,cols).getValues();
     eData.forEach(r => {
       if(r[0]) {
         sheetEventIds.add(String(r[0]));
         events.push({
           id:String(r[0]), title:r[1], date:fmtDate(r[2]),
-          startTime:r[3]||'', endTime:r[4]||'',
+          startTime:fmtTime(r[3]), endTime:fmtTime(r[4]),
           color:r[5]||'#0073ea', allDay:r[6]?true:false,
-          gcalId: (cols >= 10 ? String(r[9]||'') : '')
+          gcalId: (cols >= 10 ? String(r[9]||'') : ''),
+          description: (cols >= 11 ? String(r[10]||'') : '')
         });
       }
     });
@@ -336,14 +341,22 @@ function getAllData() {
   const notesSheet = ss.getSheetByName('Notes');
   const notes = [];
   if (notesSheet && notesSheet.getLastRow() > 1) {
-    const nData = notesSheet.getRange(2,1,notesSheet.getLastRow()-1,8).getValues();
+    const nCols = Math.min(notesSheet.getLastColumn(), 12);
+    const nData = notesSheet.getRange(2,1,notesSheet.getLastRow()-1,nCols).getValues();
     nData.forEach(r => {
       if (r[0]) {
         const driveFileId = r[2] || '';
         const content = driveFileId ? readNoteFromDrive(driveFileId) : '';
+        const tagsStr = nCols >= 9 ? String(r[8]||'') : '';
         notes.push({
           id: String(r[0]), title: r[1], content: content,
-          pinned: r[3] ? true : false, folder: r[4] || '', sortOrder: r[5] || 0
+          pinned: r[3] ? true : false, folder: r[4] || '', sortOrder: r[5] || 0,
+          createdAt: r[6] ? new Date(r[6]).toISOString() : '',
+          updatedAt: r[7] ? new Date(r[7]).toISOString() : '',
+          tags: tagsStr ? tagsStr.split(',') : [],
+          font: nCols >= 10 ? String(r[9]||'sans') : 'sans',
+          icon: nCols >= 11 ? String(r[10]||'') : '',
+          cover: nCols >= 12 ? String(r[11]||'') : ''
         });
       }
     });
@@ -393,16 +406,17 @@ function getAllDataLight() {
   const events = [];
   const sheetEventIds = new Set();
   if (eventsSheet && eventsSheet.getLastRow() > 1) {
-    const cols = Math.min(eventsSheet.getLastColumn(), 10);
+    const cols = Math.min(eventsSheet.getLastColumn(), 11);
     const eData = eventsSheet.getRange(2,1,eventsSheet.getLastRow()-1,cols).getValues();
     eData.forEach(r => {
       if(r[0]) {
         sheetEventIds.add(String(r[0]));
         events.push({
           id:String(r[0]), title:r[1], date:fmtDate(r[2]),
-          startTime:r[3]||'', endTime:r[4]||'',
+          startTime:fmtTime(r[3]), endTime:fmtTime(r[4]),
           color:r[5]||'#0073ea', allDay:r[6]?true:false,
-          gcalId: (cols >= 10 ? String(r[9]||'') : '')
+          gcalId: (cols >= 10 ? String(r[9]||'') : ''),
+          description: (cols >= 11 ? String(r[10]||'') : '')
         });
       }
     });
@@ -414,13 +428,20 @@ function getAllDataLight() {
   const notesSheet = ss.getSheetByName('Notes');
   const notes = [];
   if (notesSheet && notesSheet.getLastRow() > 1) {
-    const nData = notesSheet.getRange(2,1,notesSheet.getLastRow()-1,8).getValues();
+    const nCols = Math.min(notesSheet.getLastColumn(), 12);
+    const nData = notesSheet.getRange(2,1,notesSheet.getLastRow()-1,nCols).getValues();
     nData.forEach(r => {
       if (r[0]) {
+        const tagsStr = nCols >= 9 ? String(r[8]||'') : '';
         notes.push({
           id: String(r[0]), title: r[1], driveFileId: r[2] || '',
           pinned: r[3] ? true : false, folder: r[4] || '', sortOrder: r[5] || 0,
-          updatedAt: r[7] ? new Date(r[7]).toISOString() : ''
+          createdAt: r[6] ? new Date(r[6]).toISOString() : '',
+          updatedAt: r[7] ? new Date(r[7]).toISOString() : '',
+          tags: tagsStr ? tagsStr.split(',') : [],
+          font: nCols >= 10 ? String(r[9]||'sans') : 'sans',
+          icon: nCols >= 11 ? String(r[10]||'') : '',
+          cover: nCols >= 12 ? String(r[11]||'') : ''
         });
       }
     });
@@ -439,15 +460,21 @@ function getNoteContentById(noteId) {
   const ss = ensureSheets();
   const notesSheet = ss.getSheetByName('Notes');
   if (!notesSheet || notesSheet.getLastRow() < 2) return { error: 'Note not found' };
-  const nData = notesSheet.getRange(2,1,notesSheet.getLastRow()-1,8).getValues();
+  const nCols = Math.min(notesSheet.getLastColumn(), 12);
+  const nData = notesSheet.getRange(2,1,notesSheet.getLastRow()-1,nCols).getValues();
   for (let i = 0; i < nData.length; i++) {
     if (String(nData[i][0]) === String(noteId)) {
       const driveFileId = nData[i][2] || '';
       const content = driveFileId ? readNoteFromDrive(driveFileId) : '';
+      const tagsStr = nCols >= 9 ? String(nData[i][8]||'') : '';
       return {
         id: String(nData[i][0]), title: nData[i][1], content: content,
         pinned: nData[i][3] ? true : false, folder: nData[i][4] || '',
-        sortOrder: nData[i][5] || 0
+        sortOrder: nData[i][5] || 0,
+        tags: tagsStr ? tagsStr.split(',') : [],
+        font: nCols >= 10 ? String(nData[i][9]||'sans') : 'sans',
+        icon: nCols >= 11 ? String(nData[i][10]||'') : '',
+        cover: nCols >= 12 ? String(nData[i][11]||'') : ''
       };
     }
   }
@@ -496,12 +523,12 @@ function syncAll(fullData) {
     // Read existing gcalId mappings
     const existingGcalMap = {};  // eventId → gcalId
     if (es.getLastRow() > 1) {
-      const cols = Math.min(es.getLastColumn(), 10);
+      const cols = Math.min(es.getLastColumn(), 11);
       const existing = es.getRange(2,1,es.getLastRow()-1,cols).getValues();
       existing.forEach(r => {
         if (r[0] && cols >= 10 && r[9]) existingGcalMap[String(r[0])] = String(r[9]);
       });
-      es.getRange(2,1,es.getLastRow()-1,10).clearContent();
+      es.getRange(2,1,es.getLastRow()-1,11).clearContent();
     }
 
     (fullData.events || []).forEach((ev,i) => {
@@ -516,10 +543,15 @@ function syncAll(fullData) {
         gcalId = syncEventToGCal(ev, existingGcalId);
       }
 
-      es.getRange(i+2,1,1,10).setValues([[
-        evId, ev.title||'', ev.date||'', ev.startTime||'', ev.endTime||'',
-        ev.color||'#0073ea', ev.allDay?1:0, ev.createdAt||now, now, gcalId
+      const stFmt = fmtTime(ev.startTime);
+      const etFmt = fmtTime(ev.endTime);
+      es.getRange(i+2,1,1,11).setValues([[
+        evId, ev.title||'', ev.date||'', stFmt, etFmt,
+        ev.color||'#0073ea', ev.allDay?1:0, ev.createdAt||now, now, gcalId, ev.description||''
       ]]);
+      // Force time columns to plain text so Sheets won't auto-convert to Date
+      if (stFmt) es.getRange(i+2,4).setNumberFormat('@');
+      if (etFmt) es.getRange(i+2,5).setNumberFormat('@');
     });
   }
 
@@ -530,7 +562,7 @@ function syncAll(fullData) {
     if (ns.getLastRow() > 1) {
       const existing = ns.getRange(2,1,ns.getLastRow()-1,3).getValues();
       existing.forEach(r => { if (r[0] && r[2]) existingMap[String(r[0])] = String(r[2]); });
-      ns.getRange(2,1,ns.getLastRow()-1,8).clearContent();
+      ns.getRange(2,1,ns.getLastRow()-1,12).clearContent();
     }
     (fullData.notes || []).forEach((n,i) => {
       const noteId = String(n.id);
@@ -540,9 +572,11 @@ function syncAll(fullData) {
       if ('content' in n) {
         driveFileId = saveNoteToDrive(noteId, n.title, n.content || '', existingFileId);
       }
-      ns.getRange(i+2,1,1,8).setValues([[
+      const tagsStr = Array.isArray(n.tags) ? n.tags.join(',') : (n.tags || '');
+      ns.getRange(i+2,1,1,12).setValues([[
         noteId, n.title||'', driveFileId, n.pinned?1:0,
-        n.folder||'', n.sortOrder||0, n.createdAt||now, now
+        n.folder||'', n.sortOrder||0, n.createdAt||now, now,
+        tagsStr, n.font||'sans', n.icon||'', n.cover||''
       ]]);
     });
   }
@@ -554,4 +588,12 @@ function fmtDate(v) {
   if (!v) return '';
   if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   return String(v);
+}
+
+function fmtTime(v) {
+  if (!v) return '';
+  if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'HH:mm');
+  const s = String(v);
+  const m = s.match(/(\d{2}):(\d{2})/);
+  return m ? m[1] + ':' + m[2] : s;
 }

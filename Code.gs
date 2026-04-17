@@ -24,7 +24,7 @@ function checkAuth(e) {
 
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
-  if (action === 'ping') return json({ ok: true, version: 13 });
+  if (action === 'ping') return json({ ok: true, version: 14 });
   if (!checkAuth(e)) return json({ error: 'Unauthorized', code: 401 });
   if (action === 'init') return json(initSheet());
   if (action === 'getTasks') return json(getAllData());
@@ -632,6 +632,7 @@ function syncAll(fullData) {
     const existingServerEvents = {};  // eventId → row array
     const existingGcalMap = {};       // eventId → gcalId
     const existingEventHashMap = {};  // eventId → eventHash
+    const existingEventDescMap = {};  // eventId → description (for anti-wipe)
     if (es.getLastRow() > 1) {
       const cols = Math.min(es.getLastColumn(), 12);
       const existing = es.getRange(2,1,es.getLastRow()-1,cols).getValues();
@@ -640,6 +641,7 @@ function syncAll(fullData) {
           const eid = String(r[0]);
           existingServerEvents[eid] = r;
           if (cols >= 10 && r[9]) existingGcalMap[eid] = String(r[9]);
+          if (cols >= 11) existingEventDescMap[eid] = String(r[10] || '');
           if (cols >= 12 && r[11]) existingEventHashMap[eid] = String(r[11]);
         }
       });
@@ -670,6 +672,16 @@ function syncAll(fullData) {
       const isFromGCal = ev.fromGCal || evId.startsWith('gcal_');
       const existingGcalId = existingGcalMap[evId] || ev.gcalId || '';
 
+      // Anti-destruction: if client pushes an empty description but server
+      // already has one, keep the server value. Prevents a stale client
+      // (e.g. a browser with pre-description-fix localStorage) from wiping
+      // out description data that a different client set. Client CAN still
+      // overwrite with non-empty text.
+      const clientDesc = (ev.description != null) ? String(ev.description) : '';
+      const existingRow = existingServerEvents[evId];
+      const existingDesc = (existingRow && existingRow.length > 10) ? String(existingRow[10] || '') : '';
+      const finalDesc = (clientDesc && clientDesc.length > 0) ? clientDesc : existingDesc;
+
       // Compute a hash of the fields GCal cares about so we can skip the
       // (expensive) GCal API round-trips when nothing actually changed.
       const stFmt = fmtTime(ev.startTime);
@@ -681,7 +693,7 @@ function syncAll(fullData) {
         etFmt,
         ev.color || '#0073ea',
         ev.allDay ? '1' : '0',
-        ev.description || ''
+        finalDesc
       ].join('|');
       const newHash = hashContent(hashInput);
       const existingHash = existingEventHashMap[evId] || '';
@@ -692,7 +704,9 @@ function syncAll(fullData) {
           // No change and GCal already linked → skip the GCal API call entirely.
           gcalCallsSkipped++;
         } else {
-          gcalId = syncEventToGCal(ev, existingGcalId);
+          // Patch ev with finalDesc so GCal receives the preserved description
+          const evForGCal = Object.assign({}, ev, { description: finalDesc });
+          gcalId = syncEventToGCal(evForGCal, existingGcalId);
           gcalCallsMade++;
         }
       }
@@ -700,7 +714,7 @@ function syncAll(fullData) {
       outRows.push([
         evId, ev.title || '', ev.date || '', stFmt, etFmt,
         ev.color || '#0073ea', ev.allDay ? 1 : 0,
-        ev.createdAt || now, now, gcalId, ev.description || '',
+        ev.createdAt || now, now, gcalId, finalDesc,
         newHash
       ]);
     });
@@ -791,7 +805,7 @@ function syncAll(fullData) {
   }
 
   return {
-    success: true, timestamp: now, version: 13,
+    success: true, timestamp: now, version: 14,
     diag: { gcalCallsMade: gcalCallsMade, gcalCallsSkipped: gcalCallsSkipped }
   };
 }

@@ -599,6 +599,15 @@ class Database:
     def delete_event(self, eid):
         self.conn.execute("DELETE FROM events WHERE id=?", (eid,))
         self.conn.commit()
+        # Track deleted event IDs for sync
+        self._deleted_event_ids = getattr(self, '_deleted_event_ids', [])
+        self._deleted_event_ids.append(str(eid))
+
+    def get_deleted_event_ids(self):
+        return getattr(self, '_deleted_event_ids', [])
+
+    def clear_deleted_event_ids(self):
+        self._deleted_event_ids = []
 
     # ── Notes ──
     def get_notes(self):
@@ -1054,6 +1063,7 @@ class SyncManager:
                     "allDay": bool(ev["all_day"]),
                     "gcalId": ev["gcal_id"] if "gcal_id" in ev.keys() else "",
                 })
+            push_data["deletedEventIds"] = db.get_deleted_event_ids()
 
             # Notes — only send content for notes modified since last sync
             push_data["notes"] = []
@@ -1084,6 +1094,7 @@ class SyncManager:
             # Push succeeded — record sync time and clear deletion records
             from datetime import datetime
             self._last_sync_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            db.clear_deleted_event_ids()
             db.clear_sync_deletions()
             db.conn.close()
             self.status = self.STATUS_OK

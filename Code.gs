@@ -565,8 +565,10 @@ function syncAll(fullData) {
     });
 
     // Append server-only events (IDs not in client data) — preserve them
+    // But skip events the client explicitly deleted
+    const deletedIds = new Set((fullData.deletedEventIds || []).map(String));
     Object.keys(existingServerEvents).forEach(eid => {
-      if (!clientEventIds.has(eid)) {
+      if (!clientEventIds.has(eid) && !deletedIds.has(eid)) {
         const r = existingServerEvents[eid];
         const stFmt = fmtTime(r[3]);
         const etFmt = fmtTime(r[4]);

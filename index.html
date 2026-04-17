@@ -2598,6 +2598,7 @@
                         color: ev.color || '#0073ea', allDay: ev.all_day || false,
                         description: ev.description || ''
                     })),
+                    deletedEventIds: deletedEventIds,
                     notes: includeNotes ? notesData.notes.map(n => ({
                         id: n.id, title: n.title, content: n.content || '',
                         pinned: n.pinned || false,
@@ -2623,6 +2624,7 @@
                 });
                 const result = await resp.json();
                 if (result.error) console.error('Push sync error:', result.error);
+                else clearDeletedEventIds();  // Push succeeded, clear pending deletes
             } catch (e) { console.error('Push sync failed:', e); }
         }
 
@@ -3905,12 +3907,26 @@
             // Delete (edit mode only)
             if (isEdit) {
                 document.getElementById('evDeleteBtn').addEventListener('click', () => {
+                    trackDeletedEvent(existingEvent.id);
                     calendarData.events = calendarData.events.filter(e => String(e.id) !== String(existingEvent.id));
                     saveCalendarData();
                     renderCalendar();
                     closeModal();
                 });
             }
+        }
+
+        // Track deleted event IDs so sync can tell the server
+        let deletedEventIds = JSON.parse(localStorage.getItem('flowdesk_deleted_events') || '[]');
+
+        function trackDeletedEvent(eventId) {
+            deletedEventIds.push(String(eventId));
+            localStorage.setItem('flowdesk_deleted_events', JSON.stringify(deletedEventIds));
+        }
+
+        function clearDeletedEventIds() {
+            deletedEventIds = [];
+            localStorage.removeItem('flowdesk_deleted_events');
         }
 
         function saveCalendarData() {

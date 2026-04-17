@@ -614,24 +614,24 @@
             color: white;
         }
 
-        /* Priority Colors - FILLED badges */
+        /* Priority Colors - FILLED badges (must match PRIORITY_COLORS in JS) */
         .priority-critical {
-            background-color: #333;
-            color: white;
-        }
-
-        .priority-high {
             background-color: #e2445c;
             color: white;
         }
 
+        .priority-high {
+            background-color: #fc5a5a;
+            color: white;
+        }
+
         .priority-medium {
-            background-color: #e8830c;
+            background-color: #fdab3d;
             color: white;
         }
 
         .priority-low {
-            background-color: #579bfc;
+            background-color: #66ccff;
             color: white;
         }
 
@@ -2365,8 +2365,10 @@
         ];
 
         let appData = { groups: [], members: [] };
-        let calendarData = { events: JSON.parse(localStorage.getItem('flowdesk_events') || '[]') };
-        let notesData = { notes: JSON.parse(localStorage.getItem('flowdesk_notes') || '[]').map(n => ({ ...n, tags: Array.isArray(n.tags) ? n.tags : [], font: n.font || 'sans' })) };
+        let calendarData = { events: [] };
+        try { calendarData.events = JSON.parse(localStorage.getItem('flowdesk_events') || '[]'); } catch(e) { console.warn('Failed to parse calendar data, resetting:', e); }
+        let notesData = { notes: [] };
+        try { notesData.notes = JSON.parse(localStorage.getItem('flowdesk_notes') || '[]').map(n => ({ ...n, tags: Array.isArray(n.tags) ? n.tags : [], font: n.font || 'sans' })); } catch(e) { console.warn('Failed to parse notes data, resetting:', e); }
         let calendarDate = new Date();
         let calendarMode = 'month';
         let currentNoteId = null;
@@ -2561,12 +2563,14 @@
                     events: calendarData.events.map(ev => ({
                         id: ev.id, title: ev.title, date: ev.event_date || ev.date || '',
                         startTime: ev.start_time || '', endTime: ev.end_time || '',
-                        color: ev.color || '#0073ea', allDay: ev.all_day || false
+                        color: ev.color || '#0073ea', allDay: ev.all_day || false,
+                        description: ev.description || ''
                     })),
                     notes: notesData.notes.map(n => ({
                         id: n.id, title: n.title, content: n.content || '',
                         pinned: n.pinned || false,
                         folder: n.folder || '', tags: n.tags || [], font: n.font || 'sans',
+                        icon: n.icon || '', cover: n.cover || '', coverType: n.coverType || '',
                         sortOrder: n.sort_order || 0,
                         createdAt: n.created_at || '', updatedAt: n.updated_at || ''
                     }))
@@ -3535,7 +3539,7 @@
                 // Show events
                 if (eventsByDate[dateStr]) {
                     eventsByDate[dateStr].forEach(ev => {
-                        html += `<div class="event-pill" style="background:${ev.color || '#0073ea'}" onclick="event.stopPropagation(); editEvent(${ev.id})">${ev.all_day ? '' : ev.start_time + ' '}${ev.title}</div>`;
+                        html += `<div class="event-pill" style="background:${ev.color || '#0073ea'}" onclick="event.stopPropagation(); editEvent('${ev.id}')">${ev.all_day ? '' : ev.start_time + ' '}${escapeHtml(ev.title||'')}</div>`;
                     });
                 }
 
@@ -3610,7 +3614,7 @@
 
                 if (eventsByDate[dateStr]) {
                     eventsByDate[dateStr].forEach(ev => {
-                        html += `<div class="event-pill" style="background:${ev.color || '#0073ea'}" onclick="event.stopPropagation(); editEvent(${ev.id})">${ev.all_day ? '' : ev.start_time + ' '}${ev.title}</div>`;
+                        html += `<div class="event-pill" style="background:${ev.color || '#0073ea'}" onclick="event.stopPropagation(); editEvent('${ev.id}')">${ev.all_day ? '' : ev.start_time + ' '}${escapeHtml(ev.title||'')}</div>`;
                     });
                 }
                 if (tasksByDate[dateStr]) {
@@ -3663,9 +3667,9 @@
 
             dayEvents.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
             dayEvents.forEach(ev => {
-                html += `<div class="day-event-card" onclick="editEvent(${ev.id})" style="border-left-color:${ev.color || '#0073ea'}">
+                html += `<div class="day-event-card" onclick="editEvent('${ev.id}')" style="border-left-color:${ev.color || '#0073ea'}">
                     <div class="day-event-time">${ev.all_day ? 'All Day' : ev.start_time + ' - ' + ev.end_time}</div>
-                    <div class="day-event-title">${ev.title}</div>
+                    <div class="day-event-title">${escapeHtml(ev.title||'')}</div>
                 </div>`;
             });
 
@@ -3682,6 +3686,7 @@
         }
 
         function formatDateStr(d) {
+            if (!d || !(d instanceof Date) || isNaN(d)) return '';
             return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
         }
 
@@ -3690,7 +3695,7 @@
         }
 
         function editEvent(eventId) {
-            const ev = calendarData.events.find(e => e.id === eventId);
+            const ev = calendarData.events.find(e => String(e.id) === String(eventId));
             if (!ev) return;
             openEventModal(ev);
         }
@@ -3721,9 +3726,9 @@
             const overlay = document.createElement('div');
             overlay.id = 'eventModalOverlay';
             overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.45);z-index:10000;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.15s ease;';
-            const thm = THEMES[currentTheme] || THEMES['Light'];
-            const isDark = thm.bg.toLowerCase() < '#888';
-            const modalBg = thm.cardBg || thm.bg;
+            const thm = THEMES[currentTheme] || THEMES['light'];
+            const isDark = !!thm.isDark;
+            const modalBg = thm.card || thm.body;
             const modalText = thm.text;
             const modalBorder = thm.border;
             const inputBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
@@ -3776,6 +3781,9 @@
                     <button id="evSaveBtn" style="padding:9px 24px;border-radius:8px;border:none;background:#0073ea;color:white;font-size:14px;cursor:pointer;font-weight:500;">Save</button>
                 </div>
             </div>`;
+            // Remove any existing modal first
+            const existingOverlay = document.getElementById('eventModalOverlay');
+            if (existingOverlay) existingOverlay.remove();
             document.body.appendChild(overlay);
 
             const titleInput = document.getElementById('evTitle');
@@ -3787,21 +3795,26 @@
                 document.getElementById('evTimeRow').style.display = e.target.checked ? 'none' : 'flex';
             });
 
+            // Shared cleanup
+            const closeModal = () => { overlay.remove(); document.removeEventListener('keydown', escHandler); };
+
             // Close on overlay click
-            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
 
             // Close on Escape
-            const escHandler = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); }};
+            const escHandler = (e) => { if (e.key === 'Escape') closeModal(); };
             document.addEventListener('keydown', escHandler);
 
             // Save
             document.getElementById('evSaveBtn').addEventListener('click', () => {
                 const title = document.getElementById('evTitle').value.trim();
                 if (!title) { document.getElementById('evTitle').style.borderColor='#e2445c'; return; }
+                const evDateVal = document.getElementById('evDate').value;
+                if (!evDateVal) { document.getElementById('evDate').style.borderColor='#e2445c'; return; }
                 const selectedColor = document.querySelector('#eventModal input[name="evColor"]:checked');
                 const data = {
                     title,
-                    event_date: document.getElementById('evDate').value,
+                    event_date: evDateVal,
                     start_time: document.getElementById('evStart').value || '09:00',
                     end_time: document.getElementById('evEnd').value || '10:00',
                     color: selectedColor ? selectedColor.value : '#0073ea',
@@ -3816,27 +3829,22 @@
                 }
                 saveCalendarData();
                 renderCalendar();
-                overlay.remove();
-                document.removeEventListener('keydown', escHandler);
+                closeModal();
             });
 
             // Enter to save
             titleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('evSaveBtn').click(); });
 
             // Cancel
-            document.getElementById('evCancelBtn').addEventListener('click', () => {
-                overlay.remove();
-                document.removeEventListener('keydown', escHandler);
-            });
+            document.getElementById('evCancelBtn').addEventListener('click', () => closeModal());
 
             // Delete (edit mode only)
             if (isEdit) {
                 document.getElementById('evDeleteBtn').addEventListener('click', () => {
-                    calendarData.events = calendarData.events.filter(e => e.id !== existingEvent.id);
+                    calendarData.events = calendarData.events.filter(e => String(e.id) !== String(existingEvent.id));
                     saveCalendarData();
                     renderCalendar();
-                    overlay.remove();
-                    document.removeEventListener('keydown', escHandler);
+                    closeModal();
                 });
             }
         }
@@ -4832,9 +4840,9 @@
             // Build modal
             const overlay = document.createElement('div');
             overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:10000;display:flex;align-items:center;justify-content:center;';
-            const thm = THEMES[currentTheme] || THEMES['Light'];
+            const thm = THEMES[currentTheme] || THEMES['light'];
             const modal = document.createElement('div');
-            modal.style.cssText = `background:${thm.cardBg||thm.bg};color:${thm.text};border-radius:12px;padding:24px;min-width:340px;max-width:400px;box-shadow:0 16px 40px rgba(0,0,0,0.2);`;
+            modal.style.cssText = `background:${thm.card||thm.body};color:${thm.text};border-radius:12px;padding:24px;min-width:340px;max-width:400px;box-shadow:0 16px 40px rgba(0,0,0,0.2);`;
             modal.innerHTML = `<h3 style="margin:0 0 16px;font-size:16px;">Choose Cover</h3>
                 <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;" id="coverGrid"></div>
                 <div style="display:flex;gap:8px;justify-content:flex-end;">

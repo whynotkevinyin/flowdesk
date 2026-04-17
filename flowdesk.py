@@ -978,13 +978,19 @@ class SyncManager:
 
                     # Check if already exists locally (by id, gcal_id, or title)
                     existing = local_ev_ids.get(rid) or local_gcal_ids.get(gcal_id) or local_ev_titles.get(t)
+                    r_desc = rev.get("description", "")
                     if existing:
+                        # Preserve existing description if remote sent nothing
+                        # (local is authoritative — never blank out a description that only lives locally)
+                        existing_desc = existing.get("description", "") if hasattr(existing, "get") else ""
+                        final_desc = r_desc if r_desc else existing_desc
                         db.update_event(existing["id"],
                             event_date=rev.get("date", ""),
                             start_time=st or existing.get("start_time", ""),
                             end_time=et or existing.get("end_time", ""),
                             color=rev.get("color", "#0073ea"),
                             all_day=1 if rev.get("allDay") else 0,
+                            description=final_desc,
                             gcal_id=gcal_id)
                     else:
                         db.add_event(t, rev.get("date", ""),
@@ -992,6 +998,7 @@ class SyncManager:
                             end_time=et or "10:00",
                             color=rev.get("color", "#0073ea"),
                             all_day=1 if rev.get("allDay") else 0,
+                            description=r_desc,
                             gcal_id=gcal_id)
                 # NOTE: Never delete local events during pull.
                 # Local is authoritative — pull only adds/updates.
@@ -1066,12 +1073,14 @@ class SyncManager:
             # Events (Calendar)
             push_data["events"] = []
             for ev in db.get_events():
+                keys = ev.keys() if hasattr(ev, 'keys') else []
                 push_data["events"].append({
                     "id": str(ev["id"]), "title": ev["title"],
                     "date": ev["event_date"], "startTime": ev["start_time"],
                     "endTime": ev["end_time"], "color": ev["color"],
                     "allDay": bool(ev["all_day"]),
-                    "gcalId": ev["gcal_id"] if "gcal_id" in ev.keys() else "",
+                    "gcalId": ev["gcal_id"] if "gcal_id" in keys else "",
+                    "description": ev["description"] if "description" in keys else "",
                 })
             push_data["deletedEventIds"] = db.get_deleted_event_ids()
 

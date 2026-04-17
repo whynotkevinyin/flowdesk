@@ -2508,8 +2508,8 @@
                     return t;
                 }
                 if (data.events) {
-                    calendarData.events = data.events.map(ev => ({
-                        id: ev.id || Date.now(),
+                    const serverEvents = data.events.map(ev => ({
+                        id: String(ev.id || Date.now()),
                         title: ev.title || '',
                         event_date: ev.event_date || ev.date || '',
                         start_time: parseTimeField(ev.start_time || ev.startTime) || '09:00',
@@ -2518,13 +2518,17 @@
                         all_day: ev.all_day || ev.allDay || false,
                         description: ev.description || ''
                     }));
+                    // Merge: server wins for shared IDs, but keep local-only events
+                    const serverIds = new Set(serverEvents.map(e => String(e.id)));
+                    const localOnly = calendarData.events.filter(e => !serverIds.has(String(e.id)));
+                    calendarData.events = [...serverEvents, ...localOnly];
                     saveCalendarData();
                     const view = document.querySelector('.view-tab.active');
                     if (view && view.dataset.view === 'calendar') renderCalendar();
                 }
                 // Sync notes
                 if (data.notes) {
-                    notesData.notes = data.notes.map(n => ({
+                    const serverNotes = data.notes.map(n => ({
                         id: n.id || ('note_' + Date.now() + '_' + Math.random().toString(36).substr(2,5)),
                         title: n.title || 'Untitled',
                         content: n.content || '',
@@ -2532,10 +2536,17 @@
                         folder: n.folder || '',
                         tags: Array.isArray(n.tags) ? n.tags : [],
                         font: n.font || 'sans',
+                        icon: n.icon || '',
+                        cover: n.cover || '',
+                        coverType: n.coverType || '',
                         sort_order: n.sort_order || n.sortOrder || 0,
                         created_at: n.createdAt || n.created_at || new Date().toISOString(),
                         updated_at: n.updatedAt || n.updated_at || new Date().toISOString()
                     }));
+                    // Merge: server wins for shared IDs, but keep local-only notes
+                    const serverNoteIds = new Set(serverNotes.map(n => String(n.id)));
+                    const localOnlyNotes = notesData.notes.filter(n => !serverNoteIds.has(String(n.id)));
+                    notesData.notes = [...serverNotes, ...localOnlyNotes];
                     saveNotesData();
                     const view = document.querySelector('.view-tab.active');
                     if (view && view.dataset.view === 'notes') renderNotes();

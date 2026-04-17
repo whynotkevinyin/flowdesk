@@ -357,6 +357,7 @@ class Database:
                 end_time    TEXT    DEFAULT '10:00',
                 color       TEXT    NOT NULL DEFAULT '#0073ea',
                 all_day     INTEGER NOT NULL DEFAULT 0,
+                gcal_id     TEXT    DEFAULT '',
                 created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
             );
 
@@ -394,6 +395,7 @@ class Database:
 
     def _migrate(self):
         """Add columns that may not exist in older databases."""
+        # Notes migrations
         cols = {r[1] for r in self.conn.execute("PRAGMA table_info(notes)").fetchall()}
         if "folder" not in cols:
             self.conn.execute("ALTER TABLE notes ADD COLUMN folder TEXT NOT NULL DEFAULT ''")
@@ -407,6 +409,12 @@ class Database:
             self.conn.execute("ALTER TABLE notes ADD COLUMN icon TEXT NOT NULL DEFAULT ''")
         if "cover" not in cols:
             self.conn.execute("ALTER TABLE notes ADD COLUMN cover TEXT NOT NULL DEFAULT ''")
+        # Events migrations
+        ev_cols = {r[1] for r in self.conn.execute("PRAGMA table_info(events)").fetchall()}
+        if "gcal_id" not in ev_cols:
+            self.conn.execute("ALTER TABLE events ADD COLUMN gcal_id TEXT DEFAULT ''")
+        if "description" not in ev_cols:
+            self.conn.execute("ALTER TABLE events ADD COLUMN description TEXT DEFAULT ''")
         self.conn.commit()
 
     # ── Groups ──
@@ -1503,6 +1511,9 @@ class CalendarView(QWidget):
                     padding: 1px 4px; font-size: 9px;
                     font-weight: 600; border: none;
                 """)
+                pill.setCursor(Qt.CursorShape.PointingHandCursor)
+                eid = item["id"]
+                pill.mousePressEvent = lambda e, _eid=eid: self._edit_event(_eid)
             else:
                 status_color = STATUS_COLORS.get(item.get("status", ""), "#999")
                 pill = QLabel(f"\u25cb {item['name'][:14]}")
@@ -1516,6 +1527,9 @@ class CalendarView(QWidget):
         if len(items) > 3:
             more = QLabel(f"+{len(items) - 3} more")
             more.setStyleSheet(f"color: {t['text_dim']}; font-size: 8px; border: none;")
+            more.setCursor(Qt.CursorShape.PointingHandCursor)
+            _d_str = d_str
+            more.mousePressEvent = lambda e, ds=_d_str: self._go_to_day(ds)
             layout.addWidget(more)
 
         layout.addStretch()
@@ -1752,6 +1766,14 @@ class CalendarView(QWidget):
         dlg = EventEditDialog(self.db, default_date=self.current_date.isoformat(), parent=self)
         if dlg.exec():
             self._refresh()
+
+    def _go_to_day(self, date_str):
+        """Navigate to day view for a specific date."""
+        from datetime import date as dt_date
+        parts = date_str.split("-")
+        if len(parts) == 3:
+            self.current_date = dt_date(int(parts[0]), int(parts[1]), int(parts[2]))
+        self._set_mode("day")
 
     def _edit_event(self, eid):
         dlg = EventEditDialog(self.db, event_id=eid, parent=self)

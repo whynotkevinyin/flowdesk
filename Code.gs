@@ -24,7 +24,7 @@ function checkAuth(e) {
 
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
-  if (action === 'ping') return json({ ok: true, version: 14 });
+  if (action === 'ping') return json({ ok: true, version: 15 });
   if (!checkAuth(e)) return json({ error: 'Unauthorized', code: 401 });
   if (action === 'init') return json(initSheet());
   if (action === 'getTasks') return json(getAllData());
@@ -297,24 +297,14 @@ function initSheet() {
     membersSheet.appendRow(['Kevin']);
   }
 
-  // Events sheet — v9: added description column (11)
+  // Events sheet — v9: added description (col 11); v13: added eventHash (col 12)
   let eventsSheet = ss.getSheetByName('Events');
   if (!eventsSheet) {
     eventsSheet = ss.insertSheet('Events');
-    eventsSheet.appendRow(['id','title','date','startTime','endTime','color','allDay','createdAt','updatedAt','gcalId','description']);
-    eventsSheet.getRange(1,1,1,11).setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
+    eventsSheet.appendRow(['id','title','date','startTime','endTime','color','allDay','createdAt','updatedAt','gcalId','description','eventHash']);
+    eventsSheet.getRange(1,1,1,12).setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
     eventsSheet.setFrozenRows(1);
-    eventsSheet.setColumnWidths(1,11,140);
-  } else {
-    // Migrate: add gcalId header if missing (col 10), description (col 11)
-    const lastCol = Math.max(eventsSheet.getLastColumn(), 10);
-    const headers = eventsSheet.getRange(1,1,1,lastCol).getValues()[0];
-    if (headers[9] !== 'gcalId') {
-      eventsSheet.getRange(1,10).setValue('gcalId').setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
-    }
-    if (lastCol < 11 || headers[10] !== 'description') {
-      eventsSheet.getRange(1,11).setValue('description').setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
-    }
+    eventsSheet.setColumnWidths(1,12,140);
   }
 
   let notesSheet = ss.getSheetByName('Notes');
@@ -324,13 +314,6 @@ function initSheet() {
     notesSheet.getRange(1,1,1,13).setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
     notesSheet.setFrozenRows(1);
     notesSheet.setColumnWidths(1,13,140);
-  } else {
-    // v12 migration: add contentHash header at column 13 if missing
-    const nLastCol = Math.max(notesSheet.getLastColumn(), 12);
-    const nHeaders = notesSheet.getRange(1,1,1,nLastCol).getValues()[0];
-    if (nLastCol < 13 || nHeaders[12] !== 'contentHash') {
-      notesSheet.getRange(1,13).setValue('contentHash').setFontWeight('bold').setBackground(headerStyle.bg).setFontColor(headerStyle.fg);
-    }
   }
 
   const sheet1 = ss.getSheetByName('Sheet1');
@@ -339,7 +322,51 @@ function initSheet() {
   getNotesFolder();
   getFlowdeskCalendar(); // Ensure calendar exists
 
+  // v15: run schema migration so any missing headers on existing sheets get fixed
+  migrateSheetSchema(ss);
+
   return { success: true };
+}
+
+// v15: Idempotent schema migration. Safe to call on every request — only writes
+// missing header cells, never touches data. This fixes the long-standing bug
+// where ensureSheets() only called initSheet() if a sheet was *missing*, so
+// existing sheets never received header migrations (gcalId, description,
+// eventHash on Events; contentHash on Notes).
+function migrateSheetSchema(ss) {
+  const headerStyle = { bg: '#292f4c', fg: '#fff' };
+
+  // Events sheet — ensure cols 10 (gcalId), 11 (description), 12 (eventHash)
+  const eventsSheet = ss.getSheetByName('Events');
+  if (eventsSheet) {
+    const eLastCol = Math.max(eventsSheet.getLastColumn(), 12);
+    const eHeaders = eventsSheet.getRange(1, 1, 1, eLastCol).getValues()[0];
+    const expectedEvents = { 9: 'gcalId', 10: 'description', 11: 'eventHash' };
+    Object.keys(expectedEvents).forEach(function(idx) {
+      const i = Number(idx);
+      if (eHeaders[i] !== expectedEvents[idx]) {
+        eventsSheet.getRange(1, i + 1)
+          .setValue(expectedEvents[idx])
+          .setFontWeight('bold')
+          .setBackground(headerStyle.bg)
+          .setFontColor(headerStyle.fg);
+      }
+    });
+  }
+
+  // Notes sheet — ensure col 13 (contentHash)
+  const notesSheet = ss.getSheetByName('Notes');
+  if (notesSheet) {
+    const nLastCol = Math.max(notesSheet.getLastColumn(), 13);
+    const nHeaders = notesSheet.getRange(1, 1, 1, nLastCol).getValues()[0];
+    if (nHeaders[12] !== 'contentHash') {
+      notesSheet.getRange(1, 13)
+        .setValue('contentHash')
+        .setFontWeight('bold')
+        .setBackground(headerStyle.bg)
+        .setFontColor(headerStyle.fg);
+    }
+  }
 }
 
 function ensureSheets() {
@@ -347,6 +374,7 @@ function ensureSheets() {
   if (!ss.getSheetByName('Groups') || !ss.getSheetByName('Tasks') || !ss.getSheetByName('Events') || !ss.getSheetByName('Notes')) {
     initSheet();
   }
+  migrateSheetSchema(ss); // v15: always run schema migration
   return ss;
 }
 

@@ -1,0 +1,43 @@
+# === Personal data — NEVER commit ===
+# SQLite database (contains tasks, notes, events)
+flowdesk.db
+flowdesk.db-shm
+flowdesk.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Local config (may contain Apps Script URL + key)
+flowdesk_config.json
+
+# Runtime logs
+*.log
+flowdesk_launch.log
+
+# === Build / generated artifacts ===
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# macOS app bundle
+Flowdesk.app/
+Flowdesk.command
+
+# === Editor / OS noise ===
+.DS_Store
+.fuse_hidden*
+*.swp
+*.bak
+*~
+
+# === Dated / legacy backups ===
+index_*.html
+*.html.bak
+
+# === Credentials (stored locally only, never in repo) ===
+.git/flowdesk-pat
+.git/flowdesk-credentials
+
+# === Test scratch ===
+.flowdesk-push-test.txt

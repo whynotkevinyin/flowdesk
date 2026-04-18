@@ -952,12 +952,30 @@
             background-color: #4a4a58;
         }
 
-        /* Kanban View */
+        /* Kanban View — horizontal scroll on desktop so all 6 statuses stay visible */
         .kanban-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            display: flex;
+            flex-direction: row;
             gap: 16px;
-            align-items: start;
+            align-items: flex-start;
+            overflow-x: auto;
+            overflow-y: visible;
+            padding-bottom: 8px; /* breathing room for scrollbar */
+            scroll-snap-type: x proximity;
+        }
+
+        .kanban-container::-webkit-scrollbar {
+            height: 10px;
+        }
+        .kanban-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .kanban-container::-webkit-scrollbar-thumb {
+            background: #d0cbb8;
+            border-radius: 6px;
+        }
+        body.dark .kanban-container::-webkit-scrollbar-thumb {
+            background: #555;
         }
 
         .kanban-column {
@@ -967,6 +985,9 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
+            flex: 0 0 300px;      /* fixed 300px, no grow/shrink → horizontal scroll */
+            min-width: 300px;
+            scroll-snap-align: start;
         }
 
         body.dark .kanban-column {
@@ -1348,10 +1369,16 @@
                 font-size: 13px;
             }
 
-            /* Kanban: 2 columns */
+            /* Kanban: 2 columns, no horizontal scroll on tablet */
             .kanban-container {
+                display: grid;
                 grid-template-columns: repeat(2, 1fr);
                 gap: 12px;
+                overflow-x: visible;
+            }
+            .kanban-column {
+                flex: initial;
+                min-width: 0;
             }
 
             /* Popups */
@@ -1453,14 +1480,18 @@
                 min-width: 90px;
             }
 
-            /* Kanban: single column */
+            /* Kanban: single column, no horizontal scroll on mobile */
             .kanban-container {
+                display: grid;
                 grid-template-columns: 1fr;
                 gap: 10px;
+                overflow-x: visible;
             }
 
             .kanban-column {
                 padding: 10px;
+                flex: initial;
+                min-width: 0;
             }
 
             .kanban-card {

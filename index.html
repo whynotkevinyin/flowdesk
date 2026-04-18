@@ -2490,6 +2490,30 @@
         .prism-flow-breadcrumb .pr-bc-hint {
             color: var(--pr-muted); font-size: 11.5px;
         }
+        /* Home hero filter chip — shown when sidebar has a flow selected */
+        .prism-hero-filter {
+            display: inline-flex; align-items: center; gap: 8px;
+            margin-top: 10px;
+            padding: 5px 10px 5px 8px;
+            background: var(--pr-surface);
+            border: 1px solid var(--pr-line);
+            border-radius: 999px;
+            font-size: 12px;
+            color: var(--pr-ink);
+            max-width: fit-content;
+        }
+        .prism-hero-filter .pr-bc-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+        .prism-hero-filter .pr-bc-label strong { color: var(--pr-accent); font-weight: 600; }
+        .prism-hero-filter .pr-bc-x {
+            width: 16px; height: 16px; border-radius: 50%;
+            background: var(--pr-surface-2);
+            color: var(--pr-muted);
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 10px; margin-left: 2px;
+            cursor: pointer;
+            transition: background 0.12s, color 0.12s;
+        }
+        .prism-hero-filter .pr-bc-x:hover { background: var(--pr-accent); color: white; }
 
         .prism-user-card {
             margin-top: auto;
@@ -4232,15 +4256,11 @@
             mainApp.insertBefore(shell, mainApp.firstChild);
 
             // Wire nav buttons to switchView (also updates legacy .view-tab active)
+            // The sidebar flow filter (selectedFlowId) persists across view switches —
+            // user clears via the sidebar "All flows" row or the × on the filter chip.
             document.querySelectorAll('.prism-nav-item').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const view = btn.dataset.view;
-                    // Clicking the top-level "Flows" nav always clears the flow filter
-                    // (sidebar rows underneath are what set it)
-                    if (view === 'table') {
-                        selectedFlowId = null;
-                        if (typeof renderPrismSidebar === 'function') renderPrismSidebar();
-                    }
                     switchView(view);
                     syncPrismNavActive(view);
                 });
@@ -4591,13 +4611,13 @@
                 </div>`;
             }).join('');
             list.innerHTML = html;
-            // Click a flow row → set filter and jump to Table view
+            // Click a flow row → set filter, stay on current view, re-render so it honors the filter
             list.querySelectorAll('.prism-flow-row').forEach(row => {
                 row.addEventListener('click', () => {
                     const gid = row.dataset.gid || null;
                     selectedFlowId = gid;
-                    switchView('table');
-                    syncPrismNavActive('table');
+                    // Stay on current view — renderApp() will re-route to the correct renderer
+                    if (typeof renderApp === 'function') renderApp();
                     renderPrismSidebar();  // refresh active highlight
                 });
             });
@@ -5163,11 +5183,12 @@
                 ? appData.groups.find(g => g.id === selectedFlowId)
                 : null;
 
-            // Prism editorial masthead + KPI strip (Iter 7)
+            // Prism editorial masthead + KPI strip (Iter 7) — honors selectedFlowId
             if (isPrism) {
                 const todayStr = new Date().toISOString().slice(0, 10);
-                const allTasks = (appData.groups || []).flatMap(g => g.tasks || []);
-                const flowCount = (appData.groups || []).length;
+                const scopeGroups = activeGroup ? [activeGroup] : (appData.groups || []);
+                const allTasks = scopeGroups.flatMap(g => g.tasks || []);
+                const flowCount = scopeGroups.length;
                 const total = allTasks.length;
                 const working = allTasks.filter(t => t.status === 'Working on it').length;
                 const stuck = allTasks.filter(t => t.status === 'Stuck').length;
@@ -5176,9 +5197,9 @@
                 const pct = total > 0 ? Math.round(done / total * 100) : 0;
                 const mhWrap = document.createElement('div');
                 mhWrap.innerHTML = renderPrismViewMasthead({
-                    title: activeGroup ? 'The Flow Desk' : 'All Flows',
+                    title: activeGroup ? activeGroup.title : 'All Flows',
                     tagline: activeGroup
-                        ? `Focused on ${activeGroup.title}`
+                        ? `Focused on ${activeGroup.title} · ${total} task${total === 1 ? '' : 's'}`
                         : `${flowCount} flow${flowCount === 1 ? '' : 's'} · ${total} task${total === 1 ? '' : 's'}`,
                     kpis: [
                         { label: 'Flows',    value: flowCount, icon: '◈', color: 'var(--pr-ink)' },
@@ -5719,7 +5740,11 @@
             // ── Rows
             const rowsWrap = document.createElement('div');
             rowsWrap.className = 'pr-timeline-rows';
-            const groups = (appData && appData.groups) ? appData.groups : [];
+            // Honor sidebar flow filter
+            const _allGroups = (appData && appData.groups) ? appData.groups : [];
+            const _activeGroup = selectedFlowId ? _allGroups.find(g => g.id === selectedFlowId) : null;
+            if (selectedFlowId && !_activeGroup) selectedFlowId = null;
+            const groups = _activeGroup ? [_activeGroup] : _allGroups;
             if (groups.length === 0) {
                 rowsWrap.innerHTML = `<div class="pr-timeline-empty">No flows yet. Add a flow to see tasks on the timeline.</div>`;
             } else {
@@ -5811,7 +5836,12 @@
             container.innerHTML = '';
 
             const statuses = ['Not Started', 'Working on it', 'Waiting for review', 'On Hold', 'Stuck', 'Done'];
-            const allTasks = appData.groups.flatMap(g => g.tasks.map(t => ({ ...t, groupId: g.id })));
+            // Honor sidebar flow filter
+            const _allGroups = appData.groups || [];
+            const _activeGroup = selectedFlowId ? _allGroups.find(g => g.id === selectedFlowId) : null;
+            if (selectedFlowId && !_activeGroup) selectedFlowId = null;
+            const _kanbanGroups = _activeGroup ? [_activeGroup] : _allGroups;
+            const allTasks = _kanbanGroups.flatMap(g => (g.tasks || []).map(t => ({ ...t, groupId: g.id })));
 
             // Prism editorial masthead + KPI strip (Iter 7)
             // Kanban container is display:flex row, so the masthead+kpis must be
@@ -5830,8 +5860,10 @@
                 const mhWrap = document.createElement('div');
                 mhWrap.style.width = '100%';
                 mhWrap.innerHTML = renderPrismViewMasthead({
-                    title: 'Board',
-                    tagline: `${total} card${total === 1 ? '' : 's'} across ${statuses.length} columns`,
+                    title: _activeGroup ? _activeGroup.title : 'Board',
+                    tagline: _activeGroup
+                        ? `Board · focused on ${_activeGroup.title} · ${total} card${total === 1 ? '' : 's'}`
+                        : `${total} card${total === 1 ? '' : 's'} across ${statuses.length} columns`,
                     kpis: [
                         { label: 'Total',    value: total,     icon: '∑', color: 'var(--pr-ink)' },
                         { label: 'Working',  value: working,   icon: '⚡', color: 'var(--pr-accent)' },
@@ -6687,7 +6719,11 @@
 
         // ── Prism Bento dashboard ──
         function renderPrismDashboard(container) {
-            const groups = (appData && appData.groups) ? appData.groups : [];
+            const allGroups = (appData && appData.groups) ? appData.groups : [];
+            const activeGroup = selectedFlowId ? allGroups.find(g => g.id === selectedFlowId) : null;
+            // Stale selectedFlowId → quietly clear
+            if (selectedFlowId && !activeGroup) selectedFlowId = null;
+            const groups = activeGroup ? [activeGroup] : allGroups;
             const allTasks = groups.flatMap(g => (g.tasks || []).map(t => ({...t, groupName: g.title, groupColor: g.color, groupId: g.id})));
             const total = allTasks.length;
             const todayStr = new Date().toISOString().slice(0, 10);
@@ -6720,11 +6756,19 @@
                 <div class="prism-masthead-date">${mastheadDate} · ${esc(mastheadTagline)}</div>
             </div>`;
 
+            const filterChip = activeGroup
+                ? `<div class="prism-hero-filter">
+                     <span class="pr-bc-dot" style="background:${activeGroup.color || '#999'}"></span>
+                     <span class="pr-bc-label">Focused on <strong>${esc(activeGroup.title || '')}</strong></span>
+                     <span class="pr-bc-x" onclick="selectedFlowId=null; renderApp(); renderPrismSidebar();" title="Show all flows">✕</span>
+                   </div>`
+                : '';
             html += `
                 <div class="prism-hero">
                     <div>
-                        <h1>${greet}, Kevin</h1>
-                        <div class="prism-hero-sub">${todayLabel} · ${todayEvents.length} event${todayEvents.length===1?'':'s'} · ${todayTasks.length} task${todayTasks.length===1?'':'s'} due today</div>
+                        <h1>${activeGroup ? esc(activeGroup.title) : greet + ', Kevin'}</h1>
+                        <div class="prism-hero-sub">${todayLabel} · ${todayEvents.length} event${todayEvents.length===1?'':'s'} · ${todayTasks.length} task${todayTasks.length===1?'':'s'} due today${activeGroup ? ' · in this flow' : ''}</div>
+                        ${filterChip}
                     </div>
                     <div class="prism-hero-actions">
                         <button class="prism-btn prism-btn-ghost" onclick="document.getElementById('prismFullSyncBtn')?.click()">
@@ -6745,13 +6789,18 @@
 
             // 6-KPI row (Mission-style operator dashboard)
             const notStarted = allTasks.filter(t => t.status === 'Not Started' || !t.status).length;
+            const flowScopeCount = groups.length;
+            const progressHint = activeGroup ? 'in this flow' : 'across all flows';
+            const totalHint    = activeGroup
+                ? `in ${esc(activeGroup.title || 'flow')}`
+                : `${flowScopeCount} flow${flowScopeCount===1?'':'s'}`;
             const kpis = [
-                { label: 'Total',    value: total,        hint: `${appData.groups.length} flow${appData.groups.length===1?'':'s'}`, color: 'var(--pr-ink)',       icon: '∑' },
+                { label: 'Total',    value: total,        hint: totalHint,                 color: 'var(--pr-ink)',       icon: '∑' },
                 { label: 'Working',  value: working,      hint: 'in flight',               color: 'var(--pr-accent)',    icon: '⚡' },
                 { label: 'Stuck',    value: stuck,        hint: 'blocked',                 color: 'var(--pr-red)',       icon: '⚠' },
                 { label: 'Overdue',  value: overdue,      hint: 'past due',                color: 'var(--pr-amber)',     icon: '⏱' },
                 { label: 'Done',     value: done,         hint: `of ${total} total`,       color: 'var(--pr-green)',     icon: '✓' },
-                { label: 'Progress', value: pct + '%',    hint: 'across all flows',        color: 'var(--pr-accent-2, var(--pr-accent))', icon: '◐' },
+                { label: 'Progress', value: pct + '%',    hint: progressHint,              color: 'var(--pr-accent-2, var(--pr-accent))', icon: '◐' },
             ];
             html += '<div class="prism-bento-kpis">';
             kpis.forEach(k => {

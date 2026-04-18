@@ -2111,9 +2111,1548 @@
         body.dark .note-markdown-preview blockquote { border-left-color: #373737; color: #6B6B6B; }
         body.dark .note-markdown-preview pre { background: #252525; }
         body.dark .note-markdown-preview th, body.dark .note-markdown-preview td { border-color: #373737; }
+
+        /* ============================================================
+           PRISM THEME — Iteration 1 (Web shell + Home Bento)
+           Source: Flowdesk Design/components/variant-prism.jsx
+           ============================================================ */
+        body.prism-theme {
+            --pr-bg: #EEF0F5;
+            --pr-surface: #FFFFFF;
+            --pr-surface-2: #F4F5F9;
+            --pr-ink: #1B1D2B;
+            --pr-muted: #6B6F82;
+            --pr-line: #E2E4EC;
+            --pr-line-strong: #C9CCD9;
+            --pr-accent: #4A5CC9;
+            --pr-accent-2: #E89A3C;
+            --pr-accent-3: #3BA374;
+            --pr-accent-soft: #E0E4F5;
+            --pr-green: #3BA374;
+            --pr-amber: #D89430;
+            --pr-red: #D25A5A;
+            --pr-blue: #4A7FC9;
+            --pr-radius: 14px;
+            --pr-radius-sm: 10px;
+            --pr-shadow: 0 1px 2px rgba(27,29,43,0.04), 0 4px 20px -8px rgba(27,29,43,0.10);
+            --pr-shadow-lg: 0 4px 12px rgba(27,29,43,0.08), 0 12px 32px -12px rgba(27,29,43,0.18);
+            --pr-font: 'Inter', system-ui, sans-serif;
+            --pr-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', monospace;
+            background: var(--pr-bg);
+            color: var(--pr-ink);
+            font-family: var(--pr-font);
+            -webkit-font-smoothing: antialiased;
+            overflow: hidden;
+        }
+
+        /* ── Skin overrides (5 visual variants on top of the same shell) ──
+           Default shell = Prism. Add body.skin-{atlas|mission|horizon|ember}
+           to swap the palette/typography. skin-prism is the default (no override). */
+        body.prism-theme.skin-atlas {
+            --pr-bg: #F4EFE7;
+            --pr-surface: #FBF7EF;
+            --pr-surface-2: #F0EADF;
+            --pr-ink: #2C2419;
+            --pr-muted: #7A6F5F;
+            --pr-line: #E3DBCB;
+            --pr-line-strong: #CDC2AE;
+            --pr-accent: #B24A2D;
+            --pr-accent-2: #B07A2E;
+            --pr-accent-3: #5E7C56;
+            --pr-accent-soft: #F0D8CE;
+            --pr-green: #5E7C56;
+            --pr-amber: #B07A2E;
+            --pr-red: #A93A2B;
+            --pr-blue: #4A6D8C;
+            --pr-radius: 8px;
+            --pr-radius-sm: 6px;
+            --pr-shadow: 0 1px 2px rgba(44,36,25,0.06), 0 2px 8px -4px rgba(44,36,25,0.10);
+            --pr-shadow-lg: 0 4px 10px rgba(44,36,25,0.08), 0 10px 24px -10px rgba(44,36,25,0.18);
+            --pr-font: 'Spectral', 'Source Serif Pro', Georgia, serif;
+        }
+        body.prism-theme.skin-mission {
+            --pr-bg: #141516;
+            --pr-surface: #1B1D1F;
+            --pr-surface-2: #222527;
+            --pr-ink: #E8E6E1;
+            --pr-muted: #8A8680;
+            --pr-line: #2B2E31;
+            --pr-line-strong: #3A3D40;
+            --pr-accent: #E89A3C;
+            --pr-accent-2: #7AA8D8;
+            --pr-accent-3: #7BC48A;
+            --pr-accent-soft: #3A2E1C;
+            --pr-green: #7BC48A;
+            --pr-amber: #E0B454;
+            --pr-red: #E17A6E;
+            --pr-blue: #7AA8D8;
+            --pr-radius: 4px;
+            --pr-radius-sm: 4px;
+            --pr-shadow: 0 0 0 1px rgba(255,255,255,0.04);
+            --pr-shadow-lg: 0 0 0 1px rgba(255,255,255,0.08), 0 10px 30px rgba(0,0,0,0.4);
+            --pr-font: 'Inter Tight', 'Inter', system-ui, sans-serif;
+        }
+        body.prism-theme.skin-horizon {
+            --pr-bg: #F0EDE6;
+            --pr-surface: #FAF8F3;
+            --pr-surface-2: #E8E4DA;
+            --pr-ink: #23302A;
+            --pr-muted: #6B7A72;
+            --pr-line: #D8D3C7;
+            --pr-line-strong: #BEB7A7;
+            --pr-accent: #7B9880;
+            --pr-accent-2: #C07A52;
+            --pr-accent-3: #5F8296;
+            --pr-accent-soft: #DCE5DD;
+            --pr-green: #6F8F75;
+            --pr-amber: #C09544;
+            --pr-red: #B24A3A;
+            --pr-blue: #5F8296;
+            --pr-radius: 10px;
+            --pr-radius-sm: 8px;
+            --pr-shadow: 0 1px 3px rgba(35,48,42,0.05), 0 4px 14px -6px rgba(35,48,42,0.12);
+            --pr-shadow-lg: 0 4px 12px rgba(35,48,42,0.08), 0 14px 30px -12px rgba(35,48,42,0.18);
+            --pr-font: 'Fraunces', 'Source Sans 3', Georgia, serif;
+        }
+        body.prism-theme.skin-ember {
+            --pr-bg: #0F1512;
+            --pr-surface: #141B17;
+            --pr-surface-2: #1A221D;
+            --pr-ink: #E8E4DA;
+            --pr-muted: #7E8A82;
+            --pr-line: #233028;
+            --pr-line-strong: #324238;
+            --pr-accent: #5FB39A;
+            --pr-accent-2: #D4A44A;
+            --pr-accent-3: #6FA0D4;
+            --pr-accent-soft: #1E3028;
+            --pr-green: #6FBF8A;
+            --pr-amber: #D4A44A;
+            --pr-red: #D46B5A;
+            --pr-blue: #6FA0D4;
+            --pr-radius: 8px;
+            --pr-radius-sm: 6px;
+            --pr-shadow: 0 0 0 1px rgba(255,255,255,0.03);
+            --pr-shadow-lg: 0 0 0 1px rgba(255,255,255,0.06), 0 12px 32px rgba(0,0,0,0.5);
+            --pr-font: 'Spectral', 'Source Serif Pro', Georgia, serif;
+        }
+
+        /* Dark-skin refinements (Mission, Ember) */
+        body.prism-theme.skin-mission .prism-sidebar::-webkit-scrollbar-thumb,
+        body.prism-theme.skin-ember .prism-sidebar::-webkit-scrollbar-thumb,
+        body.prism-theme.skin-mission .prism-main::-webkit-scrollbar-thumb,
+        body.prism-theme.skin-ember .prism-main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); }
+        body.prism-theme.skin-mission .prism-btn-primary:hover,
+        body.prism-theme.skin-ember .prism-btn-primary:hover { filter: brightness(1.1); }
+
+        /* ============================================================
+           LEGACY-ELEMENT SKIN BRIDGE
+           When Prism shell is active, route all legacy surface/border/text
+           colors through the theme vars that setPrismSkin() keeps in sync
+           per skin. Semantic status & priority colors stay hard-coded since
+           they carry meaning (green=Done, red=Stuck, etc.).
+           ============================================================ */
+
+        /* Flows / group cards / table */
+        body.prism-theme .group-card,
+        body.prism-theme .group-table,
+        body.prism-theme .summary-bar           { background-color: var(--card-bg) !important; border-color: var(--border) !important; }
+        body.prism-theme .group-header,
+        body.prism-theme .group-table thead th  { background-color: var(--toolbar-bg) !important; border-color: var(--border) !important; color: var(--text) !important; }
+        body.prism-theme .group-title,
+        body.prism-theme .collapse-arrow,
+        body.prism-theme .group-table tbody td  { color: var(--text) !important; }
+        body.prism-theme .group-count           { background-color: var(--border) !important; color: var(--text) !important; }
+        body.prism-theme .group-table tbody tr  { border-bottom-color: var(--border) !important; }
+        body.prism-theme .group-table tbody tr:hover { background-color: var(--card-hover) !important; }
+        body.prism-theme .group-table tbody tr.dragging { background-color: var(--card-hover) !important; }
+        body.prism-theme .progress-bar-small    { background-color: var(--border) !important; }
+        body.prism-theme .group-title-input     { background-color: var(--editor-bg) !important; color: var(--text) !important; }
+
+        /* Kanban */
+        body.prism-theme .kanban-column         { background-color: var(--toolbar-bg) !important; }
+        body.prism-theme .kanban-column-title   { color: var(--text) !important; }
+        body.prism-theme .kanban-card           { background-color: var(--card-bg) !important; border-color: var(--border) !important; }
+        body.prism-theme .kanban-card-title     { color: var(--text) !important; }
+        body.prism-theme .kanban-card-date      { color: var(--text-dim) !important; }
+        body.prism-theme .kanban-card-progress  { background-color: var(--border) !important; }
+        body.prism-theme .kanban-container::-webkit-scrollbar-thumb { background: var(--border) !important; }
+
+        /* Calendar */
+        body.prism-theme .calendar-nav button   { background: var(--toolbar-bg) !important; border-color: var(--border) !important; color: var(--text) !important; }
+        body.prism-theme .calendar-nav button:hover { background: var(--card-hover) !important; }
+        body.prism-theme .cal-header            { color: var(--text-dim) !important; }
+        body.prism-theme .cal-cell              { background: var(--card-bg) !important; border-color: var(--border) !important; color: var(--text) !important; }
+        body.prism-theme .cal-cell:hover        { border-color: var(--accent) !important; }
+        body.prism-theme .day-event-card        { background: var(--card-bg) !important; border-top-color: var(--border) !important; color: var(--text) !important; }
+        body.prism-theme .day-event-time        { color: var(--text-dim) !important; }
+
+        /* Notes */
+        body.prism-theme .notes-sidebar,
+        body.prism-theme .note-editor           { background-color: var(--editor-bg) !important; border-color: var(--border) !important; color: var(--text) !important; }
+        body.prism-theme .notes-search          { background-color: var(--card-bg) !important; color: var(--text) !important; border-color: var(--border) !important; }
+        body.prism-theme .notes-search::placeholder,
+        body.prism-theme .note-title-input::placeholder,
+        body.prism-theme .note-content:empty::before { color: var(--text-dim) !important; }
+        body.prism-theme .notes-list-label,
+        body.prism-theme .note-breadcrumb,
+        body.prism-theme .notes-empty-search,
+        body.prism-theme .notes-empty-list-text,
+        body.prism-theme .notes-empty-list-hint { color: var(--text-dim) !important; }
+        body.prism-theme .note-item             { color: var(--text) !important; }
+        body.prism-theme .note-item:hover       { background-color: var(--card-hover) !important; }
+        body.prism-theme .note-item.active      { background-color: var(--card-hover) !important; }
+        body.prism-theme .notes-list::-webkit-scrollbar-thumb,
+        body.prism-theme .note-editor::-webkit-scrollbar-thumb,
+        body.prism-theme .note-content::-webkit-scrollbar-thumb { background: var(--border) !important; }
+        body.prism-theme .note-markdown-preview blockquote { border-left-color: var(--border) !important; color: var(--text-dim) !important; }
+        body.prism-theme .note-markdown-preview pre { background: var(--code-bg) !important; }
+        body.prism-theme .note-markdown-preview th,
+        body.prism-theme .note-markdown-preview td { border-color: var(--border) !important; }
+
+        /* Modals / popovers / dropdowns */
+        body.prism-theme .modal-content,
+        body.prism-theme .popover,
+        body.prism-theme .dropdown-menu,
+        body.prism-theme .color-picker-popup    { background-color: var(--card-bg) !important; border-color: var(--border) !important; color: var(--text) !important; }
+        body.prism-theme .color-picker-btn      { border-color: var(--border) !important; }
+
+        /* Dashboard (legacy, if visible) */
+        body.prism-theme .kpi-card              { background-color: var(--card-bg) !important; border-color: var(--border) !important; color: var(--text) !important; }
+        body.prism-theme .kpi-card .kpi-label   { color: var(--text-dim) !important; }
+        body.prism-theme .dashboard-container,
+        body.prism-theme .dashboard-card        { background-color: transparent !important; color: var(--text) !important; }
+
+        /* Dark-skin-only: add a subtle border on pills so they don't vanish on dark bg */
+        body.prism-theme.skin-mission .status-not-started,
+        body.prism-theme.skin-ember .status-not-started { background-color: #4A4D50 !important; color: #E8E6E1 !important; }
+
+        /* Hide legacy chrome when Prism is on */
+        body.prism-theme > #mainApp > header,
+        body.prism-theme > #mainApp > .summary-bar,
+        body.prism-theme > #mainApp > .container > .view-tabs { display: none !important; }
+        body.prism-theme > #mainApp > .container { padding: 0; max-width: 100%; }
+
+        /* App shell */
+        body.prism-theme #mainApp { height: 100vh; overflow: hidden; }
+        .prism-shell {
+            display: grid;
+            grid-template-columns: 232px 1fr;
+            height: 100vh;
+            width: 100vw;
+            background: var(--pr-bg);
+        }
+
+        /* Sidebar */
+        .prism-sidebar {
+            background: var(--pr-surface-2);
+            padding: 22px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            overflow-y: auto;
+            border-right: 1px solid var(--pr-line);
+        }
+        .prism-sidebar::-webkit-scrollbar { width: 6px; }
+        .prism-sidebar::-webkit-scrollbar-thumb { background: rgba(27,29,43,0.12); border-radius: 6px; }
+
+        .prism-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 4px;
+        }
+        .prism-brand-mark {
+            width: 30px; height: 30px; border-radius: 9px;
+            background: linear-gradient(135deg, var(--pr-accent), var(--pr-accent-2));
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 700; font-size: 14px;
+            box-shadow: var(--pr-shadow);
+        }
+        .prism-brand-name { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; color: var(--pr-ink); }
+
+        .prism-search-stub {
+            display: flex; align-items: center; gap: 8px;
+            padding: 10px 12px;
+            background: var(--pr-surface);
+            border-radius: var(--pr-radius-sm);
+            font-size: 12.5px; color: var(--pr-muted);
+            box-shadow: var(--pr-shadow);
+            cursor: pointer;
+            border: none;
+            width: 100%;
+            text-align: left;
+        }
+        .prism-search-stub .pr-kbd {
+            font-family: var(--pr-mono); font-size: 10px;
+            background: var(--pr-surface-2); padding: 1px 5px; border-radius: 4px;
+            margin-left: auto;
+        }
+        .prism-search-stub:hover { background: var(--pr-accent-soft); color: var(--pr-ink); }
+
+        .prism-nav { display: flex; flex-direction: column; gap: 2px; }
+        .prism-nav-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 12px;
+            border-radius: var(--pr-radius-sm);
+            font-size: 13.5px; font-weight: 500;
+            background: transparent;
+            color: var(--pr-ink);
+            border: none;
+            cursor: pointer;
+            text-align: left;
+            width: 100%;
+            transition: background 0.15s, color 0.15s;
+        }
+        .prism-nav-item:hover { background: var(--pr-surface); }
+        .prism-nav-item.active {
+            background: var(--pr-surface);
+            color: var(--pr-accent);
+            font-weight: 600;
+            box-shadow: var(--pr-shadow);
+        }
+        .prism-nav-item svg { flex-shrink: 0; }
+
+        .prism-section {
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .prism-section-label {
+            font-size: 10.5px; color: var(--pr-muted);
+            text-transform: uppercase; letter-spacing: 0.14em;
+            padding: 0 10px 6px; font-weight: 600;
+        }
+        .prism-flow-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 7px 12px; font-size: 12.5px;
+            border-radius: 8px; cursor: pointer;
+            color: var(--pr-ink);
+        }
+        .prism-flow-row:hover { background: var(--pr-surface); }
+        .prism-flow-row.active {
+            background: color-mix(in oklab, var(--pr-accent) 14%, transparent);
+            color: var(--pr-accent);
+            font-weight: 600;
+        }
+        .prism-flow-row.active .prism-flow-count {
+            background: color-mix(in oklab, var(--pr-accent) 22%, transparent);
+            color: var(--pr-accent);
+        }
+        .prism-flow-row-all .prism-flow-name { font-weight: 500; }
+        .prism-flow-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+        .prism-flow-name {
+            flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .prism-flow-count {
+            font-size: 10.5px; color: var(--pr-muted);
+            background: var(--pr-surface); padding: 1px 6px; border-radius: 999px;
+        }
+
+        /* Flow filter breadcrumb at top of Table view */
+        .prism-flow-breadcrumb {
+            display: flex; align-items: center; gap: 12px;
+            margin: 0 0 14px;
+            padding: 6px 4px 14px;
+            border-bottom: 1px solid var(--pr-line);
+        }
+        .prism-flow-breadcrumb .pr-bc-clear {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: var(--pr-surface);
+            border: 1px solid var(--pr-line);
+            border-radius: 999px;
+            padding: 6px 10px 6px 8px;
+            font-size: 12.5px;
+            color: var(--pr-ink);
+            cursor: pointer;
+            transition: background 0.12s, border-color 0.12s;
+        }
+        .prism-flow-breadcrumb .pr-bc-clear:hover {
+            background: var(--pr-surface-2);
+            border-color: var(--pr-line-strong);
+        }
+        .prism-flow-breadcrumb .pr-bc-dot {
+            width: 10px; height: 10px; border-radius: 3px;
+            flex-shrink: 0;
+        }
+        .prism-flow-breadcrumb .pr-bc-label { color: var(--pr-ink); }
+        .prism-flow-breadcrumb .pr-bc-label strong { color: var(--pr-accent); font-weight: 600; }
+        .prism-flow-breadcrumb .pr-bc-sep { color: var(--pr-muted); margin: 0 2px; }
+        .prism-flow-breadcrumb .pr-bc-x {
+            width: 18px; height: 18px; border-radius: 50%;
+            background: var(--pr-surface-2);
+            color: var(--pr-muted);
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 11px; margin-left: 4px;
+            transition: background 0.12s, color 0.12s;
+        }
+        .prism-flow-breadcrumb .pr-bc-clear:hover .pr-bc-x {
+            background: var(--pr-accent); color: white;
+        }
+        .prism-flow-breadcrumb .pr-bc-hint {
+            color: var(--pr-muted); font-size: 11.5px;
+        }
+
+        .prism-user-card {
+            margin-top: auto;
+            background: var(--pr-surface);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: var(--pr-shadow);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .prism-avatar {
+            width: 30px; height: 30px; border-radius: 9px;
+            background: linear-gradient(135deg, var(--pr-accent-2), var(--pr-accent));
+            color: white; display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 13px; flex-shrink: 0;
+        }
+        .prism-user-name { font-size: 12.5px; font-weight: 600; color: var(--pr-ink); }
+        .prism-user-sub { font-size: 10px; color: var(--pr-muted); margin-top: 1px; }
+
+        /* Main */
+        .prism-main {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--pr-bg);
+            position: relative;
+        }
+        .prism-main > .prism-page { flex: 1 1 auto; overflow-y: auto; }
+        .prism-main::-webkit-scrollbar { width: 10px; }
+        .prism-main::-webkit-scrollbar-thumb { background: rgba(27,29,43,0.12); border-radius: 10px; }
+
+        .prism-topbar {
+            display: flex; align-items: center; gap: 10px;
+            padding: 14px 28px;
+            background: var(--pr-bg);
+            position: sticky; top: 0; z-index: 20;
+            border-bottom: 1px solid transparent;
+        }
+        .prism-topbar.scrolled { border-bottom-color: var(--pr-line); background: color-mix(in oklab, var(--pr-bg) 85%, transparent); backdrop-filter: blur(8px); }
+
+        /* ── Skin picker (topbar) ── */
+        .prism-skin-picker { position: relative; }
+        .prism-skin-trigger {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 10px;
+            border-radius: var(--pr-radius-sm);
+            background: var(--pr-surface); color: var(--pr-ink);
+            box-shadow: var(--pr-shadow);
+            border: 1px solid transparent;
+            cursor: pointer; transition: background 0.15s;
+        }
+        .prism-skin-trigger:hover { background: var(--pr-accent-soft); }
+        .prism-skin-swatch-ring {
+            width: 16px; height: 16px; border-radius: 50%;
+            background: conic-gradient(#4A5CC9 0 25%, #B24A2D 25% 50%, #7B9880 50% 75%, #E89A3C 75% 100%);
+            border: 2px solid var(--pr-surface);
+            box-shadow: 0 0 0 1px var(--pr-line-strong);
+        }
+        .prism-skin-menu {
+            position: absolute; right: 0; top: calc(100% + 6px);
+            background: var(--pr-surface);
+            border: 1px solid var(--pr-line);
+            border-radius: var(--pr-radius);
+            box-shadow: var(--pr-shadow-lg);
+            padding: 8px;
+            min-width: 220px;
+            z-index: 30;
+            display: none;
+        }
+        .prism-skin-menu.open { display: block; }
+        .prism-skin-menu-label {
+            font-size: 10.5px; color: var(--pr-muted);
+            text-transform: uppercase; letter-spacing: 0.14em;
+            padding: 4px 8px 8px; font-weight: 600;
+        }
+        .prism-skin-option {
+            display: flex; align-items: center; gap: 10px;
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: var(--pr-radius-sm);
+            background: transparent; color: var(--pr-ink);
+            border: 1px solid transparent;
+            cursor: pointer;
+            text-align: left;
+            font-size: 13px;
+            transition: background 0.12s, border-color 0.12s;
+        }
+        .prism-skin-option:hover { background: var(--pr-surface-2); }
+        .prism-skin-option.active { border-color: var(--pr-accent); background: var(--pr-accent-soft); }
+        .prism-skin-swatch {
+            width: 22px; height: 22px; border-radius: 7px;
+            flex-shrink: 0;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
+        }
+        .prism-skin-swatch.skin-prism   { background: linear-gradient(135deg, #4A5CC9, #E89A3C); }
+        .prism-skin-swatch.skin-atlas   { background: linear-gradient(135deg, #B24A2D, #F4EFE7); }
+        .prism-skin-swatch.skin-mission { background: linear-gradient(135deg, #141516, #E89A3C); }
+        .prism-skin-swatch.skin-horizon { background: linear-gradient(135deg, #7B9880, #C07A52); }
+        .prism-skin-swatch.skin-ember   { background: linear-gradient(135deg, #0F1512, #5FB39A); }
+        .prism-skin-option-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+        .prism-skin-option-name { font-weight: 600; font-size: 13px; }
+        .prism-skin-option-sub  { font-size: 10.5px; color: var(--pr-muted); }
+        .prism-skin-option .pr-check {
+            margin-left: auto; opacity: 0; transition: opacity 0.12s;
+            color: var(--pr-accent); font-weight: 700;
+        }
+        .prism-skin-option.active .pr-check { opacity: 1; }
+        .prism-topbar-search {
+            flex: 1; max-width: 400px;
+            padding: 9px 14px;
+            background: var(--pr-surface);
+            border: 1px solid var(--pr-line);
+            border-radius: var(--pr-radius-sm);
+            color: var(--pr-ink); font-size: 13px;
+            outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .prism-topbar-search:focus { border-color: var(--pr-accent); box-shadow: 0 0 0 3px var(--pr-accent-soft); }
+        .prism-topbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+        .prism-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 13px;
+            border-radius: var(--pr-radius-sm);
+            font-size: 12.5px; font-weight: 500;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, transform 0.05s;
+        }
+        .prism-btn:active { transform: scale(0.98); }
+        .prism-btn-primary { background: var(--pr-accent); color: white; }
+        .prism-btn-primary:hover { background: #3D4DB8; }
+        .prism-btn-ghost { background: var(--pr-surface); color: var(--pr-ink); box-shadow: var(--pr-shadow); }
+        .prism-btn-ghost:hover { background: var(--pr-accent-soft); }
+        .prism-btn-icon { padding: 8px 10px; }
+
+        .prism-sync-dot {
+            width: 7px; height: 7px; border-radius: 50%; display: inline-block;
+            background: var(--pr-green);
+        }
+        .prism-sync-dot.syncing { background: var(--pr-amber); animation: pulse 1s infinite; }
+        .prism-sync-dot.error { background: var(--pr-red); }
+
+        /* Bento */
+        .prism-page { padding: 8px 28px 40px; font-family: var(--pr-font); }
+        .prism-hero {
+            display: flex; align-items: baseline; justify-content: space-between;
+            margin: 8px 0 22px;
+            gap: 16px;
+        }
+        .prism-hero h1 {
+            font-size: 28px; font-weight: 600; margin: 0;
+            letter-spacing: -0.02em; color: var(--pr-ink);
+        }
+        .prism-hero-sub {
+            font-size: 14px; color: var(--pr-muted);
+            margin-top: 4px;
+        }
+        .prism-hero-actions { display: flex; gap: 8px; }
+
+        .prism-bento {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+        .prism-tile {
+            background: var(--pr-surface);
+            border-radius: var(--pr-radius);
+            box-shadow: var(--pr-shadow);
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        .prism-tile.span-2 { grid-column: span 2; }
+        .prism-tile.span-3 { grid-column: span 3; }
+        .prism-tile.span-4 { grid-column: span 4; }
+        .prism-tile-stripe {
+            position: absolute; top: 0; left: 0; right: 0; height: 3px;
+        }
+        .prism-tile-head {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        .prism-tile-title { font-size: 15px; font-weight: 600; color: var(--pr-ink); }
+        .prism-tile-meta { font-size: 11px; color: var(--pr-muted); }
+        .prism-tile-link { font-size: 12px; color: var(--pr-accent); font-weight: 500; background: none; border: none; cursor: pointer; padding: 0; }
+        .prism-tile-link:hover { text-decoration: underline; }
+
+        /* KPI tiles */
+        .prism-kpi { padding: 18px; }
+        .prism-kpi-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .prism-kpi-icon {
+            width: 30px; height: 30px; border-radius: 9px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+        }
+        .prism-kpi-label { font-size: 12px; color: var(--pr-muted); font-weight: 500; }
+        .prism-kpi-value {
+            font-size: 32px; font-weight: 600; line-height: 1;
+            letter-spacing: -0.02em; color: var(--pr-ink);
+            font-variant-numeric: tabular-nums;
+        }
+        .prism-kpi-hint { font-size: 11px; color: var(--pr-muted); margin-top: 6px; }
+
+        /* On-deck list */
+        .prism-task-row {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 14px;
+            background: var(--pr-surface-2);
+            border-radius: var(--pr-radius-sm);
+            position: relative;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background 0.12s;
+        }
+        .prism-task-row:hover { background: var(--pr-accent-soft); }
+        .prism-task-row:last-child { margin-bottom: 0; }
+        .prism-task-bar {
+            position: absolute; left: 0; top: 8px; bottom: 8px;
+            width: 3px; border-radius: 2px;
+        }
+        .prism-task-check {
+            width: 18px; height: 18px; border-radius: 6px;
+            border: 1.5px solid var(--pr-line-strong);
+            background: var(--pr-surface); flex-shrink: 0;
+            margin-left: 4px;
+        }
+        .prism-task-check.done {
+            border-color: var(--pr-green); background: var(--pr-green);
+            position: relative;
+        }
+        .prism-task-check.done::after {
+            content: '✓'; position: absolute; left: 50%; top: 50%;
+            transform: translate(-50%, -50%); color: white; font-size: 11px; font-weight: 700;
+        }
+        .prism-task-body { flex: 1; min-width: 0; }
+        .prism-task-title { font-size: 13.5px; font-weight: 500; color: var(--pr-ink); }
+        .prism-task-title.done { color: var(--pr-muted); text-decoration: line-through; }
+        .prism-task-meta {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 11px; color: var(--pr-muted); margin-top: 2px;
+            flex-wrap: wrap;
+        }
+        .prism-pill {
+            font-size: 10px; font-weight: 600;
+            padding: 3px 8px; border-radius: 999px;
+            text-transform: uppercase; letter-spacing: 0.06em;
+        }
+        .prism-pill.high { color: var(--pr-red); background: rgba(210,90,90,0.12); }
+        .prism-pill.med { color: var(--pr-amber); background: rgba(216,148,48,0.12); }
+        .prism-pill.low { color: var(--pr-muted); background: var(--pr-surface-2); }
+
+        /* ============================================================
+           P0 / P1 / P2 priority tokens — Mission-style operator badge
+           Critical→P0, High→P1, Medium→P2, Low→P3
+           ============================================================ */
+        .prism-prio {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 24px; height: 18px;
+            padding: 0 5px;
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 10px; font-weight: 700;
+            letter-spacing: 0.08em;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            text-transform: uppercase;
+            user-select: none;
+        }
+        .prism-prio.p0 { color: var(--pr-red);    border-color: color-mix(in oklab, var(--pr-red) 55%, transparent);    background: color-mix(in oklab, var(--pr-red) 14%, transparent); }
+        .prism-prio.p1 { color: var(--pr-amber);  border-color: color-mix(in oklab, var(--pr-amber) 55%, transparent);  background: color-mix(in oklab, var(--pr-amber) 12%, transparent); }
+        .prism-prio.p2 { color: var(--pr-blue);   border-color: color-mix(in oklab, var(--pr-blue) 45%, transparent);   background: color-mix(in oklab, var(--pr-blue) 10%, transparent); }
+        .prism-prio.p3 { color: var(--pr-muted);  border-color: var(--pr-line);                                         background: var(--pr-surface-2); }
+        /* Atlas skin overrides priority tokens to look more editorial */
+        body.prism-theme.skin-atlas .prism-prio {
+            border-radius: 2px;
+            font-weight: 600;
+        }
+
+        /* Today schedule mini */
+        .prism-schedule {
+            position: relative; height: 280px;
+            background: var(--pr-surface-2); border-radius: var(--pr-radius-sm);
+            padding: 12px 14px 12px 48px;
+            overflow: hidden;
+        }
+        .prism-schedule-hour {
+            position: absolute; left: 14px;
+            font-size: 10.5px; color: var(--pr-muted);
+            font-family: var(--pr-mono);
+        }
+        .prism-schedule-line {
+            position: absolute; left: 46px; right: 14px;
+            border-top: 1px dashed var(--pr-line);
+        }
+        .prism-schedule-event {
+            position: absolute; left: 48px; right: 14px;
+            border-radius: 8px; padding: 4px 10px;
+            font-size: 11.5px; line-height: 1.3;
+            overflow: hidden;
+        }
+        .prism-schedule-event-title { font-weight: 500; color: var(--pr-ink); }
+        .prism-schedule-event-time { color: var(--pr-muted); font-size: 10.5px; }
+        .prism-schedule-empty {
+            display: flex; align-items: center; justify-content: center;
+            height: 100%; color: var(--pr-muted); font-size: 12.5px;
+        }
+
+        /* Flows progress */
+        .prism-flow-prog { margin-bottom: 14px; }
+        .prism-flow-prog:last-child { margin-bottom: 0; }
+        .prism-flow-prog-head {
+            display: flex; align-items: center; gap: 8px;
+            margin-bottom: 6px;
+        }
+        .prism-flow-prog-dot { width: 10px; height: 10px; border-radius: 3px; }
+        .prism-flow-prog-name { font-size: 13px; font-weight: 500; flex: 1; color: var(--pr-ink); }
+        .prism-flow-prog-stat { font-size: 11px; color: var(--pr-muted); }
+        .prism-flow-prog-warn { font-size: 10px; font-weight: 600; color: var(--pr-red); }
+        .prism-flow-prog-bar {
+            height: 6px; background: var(--pr-surface-2);
+            border-radius: 6px; overflow: hidden;
+        }
+        .prism-flow-prog-fill { height: 100%; border-radius: 6px; transition: width 0.3s; }
+
+        /* Recent notes grid */
+        .prism-notes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .prism-note-card {
+            background: var(--pr-surface-2);
+            padding: 14px; border-radius: var(--pr-radius-sm);
+            cursor: pointer;
+            transition: background 0.12s, transform 0.12s;
+        }
+        .prism-note-card:hover { background: var(--pr-accent-soft); transform: translateY(-1px); }
+        .prism-note-card-tag {
+            display: flex; align-items: center; gap: 6px;
+            margin-bottom: 6px;
+        }
+        .prism-note-card-tag-dot { width: 6px; height: 6px; border-radius: 50%; }
+        .prism-note-card-tag-name {
+            font-size: 10px; color: var(--pr-muted);
+            text-transform: uppercase; letter-spacing: 0.1em;
+        }
+        .prism-note-card-title {
+            font-size: 13.5px; font-weight: 600;
+            line-height: 1.3; margin-bottom: 6px;
+            color: var(--pr-ink);
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .prism-note-card-preview {
+            font-size: 11.5px; color: var(--pr-muted); line-height: 1.5;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .prism-note-card-time { font-size: 10px; color: var(--pr-muted); margin-top: 8px; }
+
+        /* Quick capture gradient tile */
+        .prism-capture {
+            background: linear-gradient(135deg, var(--pr-accent) 0%, var(--pr-accent-2) 100%);
+            color: white;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .prism-capture:hover { transform: translateY(-2px); box-shadow: var(--pr-shadow-lg); }
+        .prism-capture-inner { display: flex; gap: 16px; align-items: center; }
+        .prism-capture-text { flex: 1; }
+        .prism-capture-eyebrow {
+            font-size: 11px; opacity: 0.85;
+            letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600;
+        }
+        .prism-capture-title {
+            font-size: 22px; font-weight: 600; letter-spacing: -0.02em;
+            margin-top: 6px; line-height: 1.2;
+        }
+        .prism-capture-hint { font-size: 13px; opacity: 0.9; margin-top: 10px; }
+        .prism-capture-hint kbd {
+            background: rgba(255,255,255,0.22); padding: 2px 7px;
+            border-radius: 5px; font-family: var(--pr-mono); font-size: 11px;
+        }
+        .prism-capture-icon {
+            width: 90px; height: 90px;
+            background: rgba(255,255,255,0.18);
+            border-radius: 20px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 38px;
+            backdrop-filter: blur(8px);
+            flex-shrink: 0;
+        }
+
+        /* Week ahead heatmap */
+        .prism-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+        .prism-week-day {
+            background: var(--pr-surface-2);
+            border-radius: var(--pr-radius-sm);
+            padding: 12px;
+            border: 1.5px solid transparent;
+            min-height: 80px;
+        }
+        .prism-week-day.today { border-color: var(--pr-accent); }
+        .prism-week-day.weekend { background: color-mix(in oklab, var(--pr-surface-2) 55%, var(--pr-bg)); }
+        .prism-week-day.weekend .prism-week-day-label { color: color-mix(in oklab, var(--pr-muted) 70%, var(--pr-accent)); }
+        .prism-week-day.past { opacity: 0.55; }
+        .prism-week-day-label {
+            font-size: 10.5px; color: var(--pr-muted);
+            text-transform: uppercase; letter-spacing: 0.1em;
+        }
+        .prism-week-day-num {
+            font-size: 22px; font-weight: 600; margin-top: 2px;
+            color: var(--pr-ink);
+        }
+        .prism-week-day.today .prism-week-day-num { color: var(--pr-accent); }
+        .prism-week-day-bar {
+            height: 4px; background: var(--pr-line);
+            border-radius: 4px; margin-top: 10px; overflow: hidden;
+        }
+        .prism-week-day-fill { height: 100%; background: var(--pr-accent); border-radius: 4px; transition: width 0.3s; }
+        .prism-week-day-count { font-size: 11px; color: var(--pr-muted); margin-top: 6px; }
+
+        /* Empty state */
+        .prism-empty {
+            color: var(--pr-muted); font-size: 12.5px;
+            padding: 16px; text-align: center;
+        }
+
+        /* 6-KPI grid (Mission-style operator dashboard) */
+        .prism-bento-kpis {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .prism-bento-kpis .prism-tile { padding: 14px 16px; }
+        .prism-bento-kpis .prism-kpi-icon { width: 26px; height: 26px; font-size: 14px; border-radius: 7px; }
+        .prism-bento-kpis .prism-kpi-value { font-size: 26px; }
+        @media (max-width: 1100px) { .prism-bento-kpis { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 760px)  { .prism-bento-kpis { grid-template-columns: repeat(2, 1fr); } }
+
+        /* View-header KPI strip — compact horizontal meta bar that sits below
+           each view's editorial masthead (Tasks / Kanban / Calendar / Notes).
+           Distinct from the big bento KPIs; this is a single row of lightweight
+           cells matched to the view (e.g. flow count, overdue, etc.). */
+        .prism-view-kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            margin: 0 0 22px;
+            padding: 10px 12px;
+            background: var(--pr-surface);
+            border: 1px solid var(--pr-line);
+            border-radius: 10px;
+        }
+        .prism-view-kpi {
+            display: flex; align-items: center; gap: 10px;
+            padding: 4px 8px;
+            border-right: 1px solid var(--pr-line);
+        }
+        .prism-view-kpi:last-child { border-right: 0; }
+        .prism-view-kpi-icon {
+            width: 24px; height: 24px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 6px; font-size: 12px; font-weight: 700;
+            flex: 0 0 auto;
+        }
+        .prism-view-kpi-body { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+        .prism-view-kpi-label {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 9.5px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--pr-muted);
+            margin-bottom: 2px;
+        }
+        .prism-view-kpi-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--pr-ink);
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+        }
+        body.prism-theme.skin-atlas .prism-view-kpi-value {
+            font-family: 'Spectral', 'Source Serif Pro', Georgia, serif;
+            font-weight: 600;
+        }
+        .prism-view-kpi-hint {
+            font-size: 10px;
+            color: var(--pr-muted);
+            margin-top: 2px;
+        }
+        @media (max-width: 760px) {
+            .prism-view-kpi { border-right: 0; border-bottom: 1px solid var(--pr-line); padding-bottom: 8px; }
+            .prism-view-kpi:last-child { border-bottom: 0; }
+        }
+
+        /* Per-view editorial masthead spacing tweak — keep tight under topbar */
+        body.prism-theme .groups-container > .prism-masthead,
+        body.prism-theme .kanban-container > .prism-masthead,
+        body.prism-theme #calendarView > .prism-masthead,
+        body.prism-theme #notesView  > .prism-masthead {
+            margin-top: 4px;
+            margin-bottom: 14px;
+        }
+
+        /* When Prism is active, the Kanban container becomes a vertical stack
+           so that masthead + KPI strip sit above the horizontally-scrolling
+           column row. The inner .prism-kanban-columns is what scrolls. */
+        body.prism-theme .kanban-container {
+            flex-direction: column;
+            overflow-x: visible;
+            align-items: stretch;
+        }
+        body.prism-theme .prism-kanban-columns {
+            scroll-snap-type: x proximity;
+        }
+
+        /* Prism Notes — reclaim vertical space consumed by the masthead+KPI
+           strip so the two-column layout still fits in the viewport without
+           scrolling the outer page. */
+        body.prism-theme #notesView > .notes-container {
+            height: calc(100vh - 320px);
+            min-height: 420px;
+        }
+
+        /* Activity Log (Mission variant) */
+        .prism-activity {
+            max-height: 320px; overflow-y: auto;
+            margin: -4px -4px -4px 0; padding-right: 4px;
+        }
+        .prism-activity-row {
+            display: grid;
+            grid-template-columns: 58px 22px 1fr;
+            gap: 10px; align-items: baseline;
+            padding: 7px 4px;
+            border-bottom: 1px solid var(--pr-line);
+            font-size: 12.5px;
+            line-height: 1.4;
+        }
+        .prism-activity-row:last-child { border-bottom: 0; }
+        .prism-activity-time {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 11px;
+            color: var(--pr-muted);
+            font-variant-numeric: tabular-nums;
+        }
+        .prism-activity-glyph {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-align: center;
+            color: var(--pr-muted);
+            padding: 1px 4px;
+            border-radius: 4px;
+            background: var(--pr-surface-2);
+        }
+        .prism-activity-glyph.add     { color: var(--pr-green);  background: color-mix(in oklab, var(--pr-green) 14%, transparent); }
+        .prism-activity-glyph.done    { color: var(--pr-green);  background: color-mix(in oklab, var(--pr-green) 14%, transparent); }
+        .prism-activity-glyph.move    { color: var(--pr-accent); background: color-mix(in oklab, var(--pr-accent) 14%, transparent); }
+        .prism-activity-glyph.stuck   { color: var(--pr-red);    background: color-mix(in oklab, var(--pr-red) 14%, transparent); }
+        .prism-activity-glyph.flow    { color: var(--pr-accent-2, var(--pr-amber)); background: color-mix(in oklab, var(--pr-accent-2, var(--pr-amber)) 14%, transparent); }
+        .prism-activity-glyph.sync    { color: var(--pr-muted);  background: var(--pr-surface-2); }
+        .prism-activity-body { color: var(--pr-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+        .prism-activity-body .ac-target { font-weight: 500; color: var(--pr-ink); }
+        .prism-activity-body .ac-arrow  { color: var(--pr-muted); margin: 0 4px; }
+        .prism-activity-body .ac-to     { color: var(--pr-ink); }
+        .prism-activity-empty {
+            color: var(--pr-muted); font-size: 12px;
+            padding: 22px 8px; text-align: center;
+        }
+
+        /* Hotkey legend card */
+        .prism-hotkeys {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 18px;
+        }
+        .prism-hotkey-row {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px; padding: 5px 0;
+            font-size: 12.5px;
+            border-bottom: 1px dashed var(--pr-line);
+        }
+        .prism-hotkey-row:last-child { border-bottom: 0; }
+        .prism-hotkey-label { color: var(--pr-ink); }
+        .prism-hotkey-keys { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+        .prism-hotkey-keys kbd {
+            display: inline-block;
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 10.5px;
+            padding: 2px 6px;
+            border-radius: 5px;
+            background: var(--pr-surface-2);
+            color: var(--pr-ink);
+            border: 1px solid var(--pr-line);
+            min-width: 18px; text-align: center;
+            box-shadow: 0 1px 0 var(--pr-line);
+        }
+        .prism-hotkey-keys .plus { color: var(--pr-muted); font-size: 10px; }
+        .prism-hotkey-group-title {
+            grid-column: span 2;
+            font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
+            font-weight: 600; color: var(--pr-muted);
+            margin: 4px 0 2px;
+        }
+        .prism-hotkey-group-title:first-child { margin-top: 0; }
+
+        /* Status footer (Mission variant) */
+        .prism-status-footer {
+            display: flex; align-items: center; gap: 14px;
+            height: 28px; padding: 0 16px;
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 11px;
+            color: var(--pr-muted);
+            background: var(--pr-surface);
+            border-top: 1px solid var(--pr-line);
+            z-index: 20;
+            flex-shrink: 0;
+        }
+        .prism-status-footer .status-item { display: inline-flex; align-items: center; gap: 6px; }
+        .prism-status-footer .status-sep { color: var(--pr-line-strong); }
+        .prism-status-footer .status-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--pr-green);
+            box-shadow: 0 0 0 3px color-mix(in oklab, var(--pr-green) 22%, transparent);
+        }
+        .prism-status-footer .status-dot.syncing {
+            background: var(--pr-accent);
+            box-shadow: 0 0 0 3px color-mix(in oklab, var(--pr-accent) 22%, transparent);
+            animation: pr-pulse 1.1s ease-in-out infinite;
+        }
+        .prism-status-footer .status-dot.error {
+            background: var(--pr-red);
+            box-shadow: 0 0 0 3px color-mix(in oklab, var(--pr-red) 22%, transparent);
+        }
+        @keyframes pr-pulse { 50% { opacity: 0.45; } }
+        .prism-status-footer .status-version {
+            margin-left: auto;
+            padding: 1px 7px; border-radius: 4px;
+            background: var(--pr-surface-2); color: var(--pr-ink);
+            letter-spacing: 0.04em;
+        }
+        .prism-status-footer .status-hint {
+            color: var(--pr-muted);
+            background: var(--pr-surface-2);
+            padding: 1px 7px; border-radius: 4px;
+            border: 1px solid var(--pr-line);
+        }
+        .prism-status-footer .status-clickable {
+            cursor: pointer;
+            padding: 1px 4px; border-radius: 4px;
+            transition: background 0.12s, color 0.12s;
+        }
+        .prism-status-footer .status-clickable:hover {
+            background: var(--pr-surface-2);
+            color: var(--pr-ink);
+        }
+        /* ============================================================
+           FOCUS MODE (Ember variant)
+           Full-screen overlay with single task + 50-min timer + queue
+           ============================================================ */
+        .prism-focus-overlay {
+            position: fixed; inset: 0;
+            background: var(--pr-bg);
+            z-index: 9000;
+            display: none;
+            flex-direction: column;
+            font-family: var(--pr-font);
+            color: var(--pr-ink);
+            animation: focusFadeIn 0.3s ease;
+        }
+        .prism-focus-overlay.visible { display: flex; }
+        @keyframes focusFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .prism-focus-topbar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 18px 28px;
+            border-bottom: 1px solid var(--pr-line);
+        }
+        .prism-focus-brand {
+            display: flex; align-items: center; gap: 10px;
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 11px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--pr-muted);
+        }
+        .prism-focus-brand::before {
+            content: ''; width: 7px; height: 7px; border-radius: 50%;
+            background: var(--pr-accent);
+            box-shadow: 0 0 0 3px color-mix(in oklab, var(--pr-accent) 22%, transparent);
+            animation: pr-pulse 1.8s ease-in-out infinite;
+        }
+        .prism-focus-exit {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 11px;
+            color: var(--pr-muted);
+            padding: 5px 10px;
+            border-radius: 6px;
+            background: var(--pr-surface);
+            cursor: pointer; border: 1px solid var(--pr-line);
+        }
+        .prism-focus-exit:hover { color: var(--pr-ink); border-color: var(--pr-line-strong); }
+
+        .prism-focus-body {
+            flex: 1; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            padding: 24px 40px;
+            max-width: 860px; margin: 0 auto;
+            width: 100%;
+        }
+        .prism-focus-eyebrow {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 11px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--pr-muted);
+            margin-bottom: 22px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .prism-focus-eyebrow .pr-focus-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+        }
+        .prism-focus-title {
+            font-family: var(--pr-font);
+            font-size: 44px;
+            font-weight: 500;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+            text-align: center;
+            color: var(--pr-ink);
+            margin: 0 0 14px;
+            max-width: 720px;
+        }
+        body.prism-theme.skin-ember .prism-focus-title,
+        body.prism-theme.skin-atlas .prism-focus-title {
+            font-family: var(--pr-font-serif, 'Spectral', 'Source Serif Pro', Georgia, serif);
+            font-weight: 400;
+            letter-spacing: -0.01em;
+        }
+        .prism-focus-meta {
+            display: flex; gap: 18px; flex-wrap: wrap;
+            justify-content: center;
+            font-size: 13px;
+            color: var(--pr-muted);
+            margin-bottom: 28px;
+        }
+        .prism-focus-meta .meta-item { display: inline-flex; align-items: center; gap: 6px; }
+        .prism-focus-meta .meta-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+        /* Blocker callout (when focused task is Stuck) */
+        .prism-focus-blocker {
+            display: none;
+            align-items: center; gap: 10px;
+            background: color-mix(in oklab, var(--pr-red) 14%, transparent);
+            border: 1px solid color-mix(in oklab, var(--pr-red) 32%, transparent);
+            color: var(--pr-red);
+            font-size: 12px; font-weight: 600;
+            padding: 8px 14px; border-radius: 8px;
+            letter-spacing: 0.06em; text-transform: uppercase;
+            margin-bottom: 22px;
+        }
+        .prism-focus-blocker.visible { display: inline-flex; }
+        .prism-focus-blocker::before { content: '⚠'; font-size: 14px; }
+
+        /* Notes preview */
+        .prism-focus-notes {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--pr-muted);
+            text-align: center;
+            max-width: 640px;
+            margin-bottom: 30px;
+            white-space: pre-wrap;
+            max-height: 110px; overflow: hidden;
+            position: relative;
+        }
+
+        /* Timer */
+        .prism-focus-timer {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 54px;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            color: var(--pr-ink);
+            font-variant-numeric: tabular-nums;
+            margin-bottom: 8px;
+            line-height: 1;
+        }
+        .prism-focus-timer.paused { color: var(--pr-muted); }
+        .prism-focus-timer-label {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 10.5px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--pr-muted);
+            margin-bottom: 28px;
+        }
+
+        /* Action buttons */
+        .prism-focus-actions {
+            display: flex; gap: 10px; flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 32px;
+        }
+        .pr-focus-btn {
+            font-family: var(--pr-font);
+            font-size: 13px;
+            padding: 9px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-flex; align-items: center; gap: 6px;
+            transition: background 0.12s, border-color 0.12s;
+            border: 1px solid var(--pr-line);
+            background: var(--pr-surface);
+            color: var(--pr-ink);
+        }
+        .pr-focus-btn:hover { background: var(--pr-surface-2); border-color: var(--pr-line-strong); }
+        .pr-focus-btn.primary {
+            background: var(--pr-accent);
+            color: white;
+            border-color: var(--pr-accent);
+        }
+        .pr-focus-btn.primary:hover { background: color-mix(in oklab, var(--pr-accent) 80%, black); }
+        .pr-focus-btn.danger {
+            color: var(--pr-red);
+            border-color: color-mix(in oklab, var(--pr-red) 35%, transparent);
+        }
+        .pr-focus-btn.danger:hover {
+            background: color-mix(in oklab, var(--pr-red) 12%, transparent);
+        }
+        .pr-focus-btn kbd {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 10px;
+            padding: 1px 5px; border-radius: 4px;
+            background: color-mix(in oklab, var(--pr-ink) 8%, transparent);
+            color: var(--pr-muted);
+            margin-left: 4px;
+        }
+
+        /* Queue strip at bottom */
+        .prism-focus-queue {
+            border-top: 1px solid var(--pr-line);
+            padding: 16px 28px;
+            display: flex; flex-direction: column; gap: 8px;
+            max-height: 220px; overflow-y: auto;
+        }
+        .prism-focus-queue-title {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 10.5px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--pr-muted);
+            margin-bottom: 6px;
+        }
+        .prism-focus-q-row {
+            display: grid;
+            grid-template-columns: 22px 1fr auto;
+            gap: 12px; align-items: center;
+            padding: 6px 10px;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .prism-focus-q-row:hover { background: var(--pr-surface); }
+        .prism-focus-q-icon {
+            font-size: 13px; text-align: center;
+            font-family: var(--pr-mono, ui-monospace);
+            color: var(--pr-muted);
+        }
+        .prism-focus-q-icon.running { color: var(--pr-accent); }
+        .prism-focus-q-icon.done    { color: var(--pr-green); }
+        .prism-focus-q-icon.stuck   { color: var(--pr-red); }
+        .prism-focus-q-name {
+            font-size: 13.5px; color: var(--pr-ink);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .prism-focus-q-row.done .prism-focus-q-name { color: var(--pr-muted); text-decoration: line-through; }
+        .prism-focus-q-sub {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 10.5px; color: var(--pr-muted);
+            padding: 2px 7px; border-radius: 4px;
+            background: var(--pr-surface-2);
+        }
+
+        /* ============================================================
+           ATLAS masthead / editorial touches
+           Skin-gated — shows everywhere but feels native in Atlas
+           ============================================================ */
+        .prism-masthead {
+            display: flex; align-items: baseline; justify-content: space-between;
+            gap: 20px;
+            border-top: 3px double var(--pr-line-strong);
+            border-bottom: 1px solid var(--pr-line-strong);
+            padding: 8px 0 10px;
+            margin: 0 0 18px;
+            font-family: var(--pr-font-serif, var(--pr-font));
+        }
+        .prism-masthead-title {
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            color: var(--pr-ink);
+            text-transform: uppercase;
+        }
+        body.prism-theme.skin-atlas .prism-masthead-title {
+            font-family: 'Spectral', 'Source Serif Pro', Georgia, serif;
+            font-weight: 500;
+            letter-spacing: 0.14em;
+        }
+        .prism-masthead-issue {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 10.5px;
+            color: var(--pr-muted);
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+        .prism-masthead-date {
+            font-family: var(--pr-font-serif, var(--pr-font));
+            font-style: italic;
+            font-size: 13px;
+            color: var(--pr-muted);
+        }
+
+        /* Quote tile (Atlas rotating reflection) */
+        .prism-quote {
+            background: var(--pr-surface);
+            padding: 26px 28px;
+            position: relative;
+        }
+        .prism-quote-mark {
+            position: absolute; top: 4px; left: 14px;
+            font-family: 'Spectral', 'Source Serif Pro', Georgia, serif;
+            font-size: 70px; line-height: 0.8;
+            color: color-mix(in oklab, var(--pr-accent) 30%, transparent);
+            font-weight: 700;
+        }
+        .prism-quote-text {
+            position: relative;
+            font-family: 'Spectral', 'Source Serif Pro', Georgia, serif;
+            font-size: 16px;
+            line-height: 1.5;
+            color: var(--pr-ink);
+            font-style: italic;
+            padding-left: 14px;
+            margin-bottom: 12px;
+        }
+        .prism-quote-author {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 10.5px;
+            color: var(--pr-muted);
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            padding-left: 14px;
+        }
+        .prism-quote-author::before { content: '— '; }
+
+        /* Agenda list (Atlas editorial numbered list) */
+        .prism-agenda-row {
+            display: grid;
+            grid-template-columns: 30px 1fr auto;
+            gap: 14px; align-items: baseline;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--pr-line);
+        }
+        .prism-agenda-row:last-child { border-bottom: 0; }
+        .prism-agenda-num {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 11px;
+            color: var(--pr-muted);
+            font-variant-numeric: tabular-nums;
+        }
+        body.prism-theme.skin-atlas .prism-agenda-num {
+            font-family: 'Spectral', 'Source Serif Pro', Georgia, serif;
+            font-style: italic;
+            font-size: 13px;
+        }
+        .prism-agenda-title {
+            font-size: 14px;
+            color: var(--pr-ink);
+        }
+        body.prism-theme.skin-atlas .prism-agenda-title {
+            font-family: 'Spectral', 'Source Serif Pro', Georgia, serif;
+            font-size: 15px;
+        }
+        .prism-agenda-title.done { color: var(--pr-muted); text-decoration: line-through; }
+        .prism-agenda-meta {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 10.5px;
+            color: var(--pr-muted);
+            letter-spacing: 0.06em;
+        }
+
+        /* Event kind glyphs (Atlas calendar) */
+        .prism-schedule-event .pr-glyph {
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 11px;
+            margin-right: 4px;
+            opacity: 0.75;
+        }
+
+        /* G-then-X mode indicator (briefly shown while waiting for 2nd key) */
+        .prism-gmode-hint {
+            position: fixed; bottom: 46px; left: 50%; transform: translateX(-50%);
+            background: var(--pr-ink); color: var(--pr-surface);
+            font-family: var(--pr-mono, ui-monospace);
+            font-size: 12px;
+            padding: 8px 14px; border-radius: 8px;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.24);
+            z-index: 9999;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.12s;
+        }
+        .prism-gmode-hint.visible { opacity: 1; }
+
+        /* Responsive: collapse to 2-col on smaller screens */
+        @media (max-width: 1100px) {
+            .prism-bento { grid-template-columns: repeat(2, 1fr); }
+            .prism-tile.span-3, .prism-tile.span-4 { grid-column: span 2; }
+            .prism-hotkeys { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 760px) {
+            .prism-shell { grid-template-columns: 1fr; }
+            .prism-sidebar { display: none; }
+            .prism-bento { grid-template-columns: 1fr; }
+            .prism-tile.span-2, .prism-tile.span-3, .prism-tile.span-4 { grid-column: span 1; }
+        }
+
+        /* ============================================================
+           TIMELINE view — Horizon variant's 14-day Gantt ribbon
+           Works in every skin (all colors via --pr-* vars)
+           ============================================================ */
+        #timelineView { overflow-x: auto; padding: 12px 0 32px; }
+        .pr-timeline {
+            font-family: var(--pr-font);
+            color: var(--pr-ink);
+            min-width: 900px;
+            background: var(--pr-surface);
+            border-radius: var(--pr-radius);
+            overflow: hidden;
+            box-shadow: var(--pr-shadow);
+        }
+        .pr-timeline-header, .pr-timeline-row {
+            display: grid;
+            grid-template-columns: 210px 1fr;
+            align-items: stretch;
+        }
+        .pr-timeline-header {
+            position: sticky; top: 0;
+            background: var(--pr-surface);
+            z-index: 5;
+            border-bottom: 1px solid var(--pr-line);
+        }
+        .pr-timeline-header-corner {
+            padding: 10px 14px;
+            display: flex; flex-direction: column; justify-content: center;
+            border-right: 1px solid var(--pr-line);
+            background: var(--pr-surface-2);
+        }
+        .pr-timeline-title { font-size: 12.5px; font-weight: 700; color: var(--pr-ink); letter-spacing: 0.01em; }
+        .pr-timeline-sub   { font-size: 10px; color: var(--pr-muted); margin-top: 2px; font-family: var(--pr-mono); }
+
+        .pr-timeline-header-days {
+            display: grid;
+            grid-template-columns: repeat(14, minmax(0, 1fr));
+        }
+        .pr-timeline-day-head {
+            padding: 10px 4px;
+            text-align: center;
+            border-right: 1px solid var(--pr-line);
+            font-size: 10.5px;
+            transition: background 0.15s;
+        }
+        .pr-timeline-day-head:last-child { border-right: none; }
+        .pr-timeline-day-dow { color: var(--pr-muted); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; font-size: 9.5px; }
+        .pr-timeline-day-num { font-size: 15px; font-weight: 600; color: var(--pr-ink); margin-top: 3px; }
+        .pr-timeline-day-head.today { background: color-mix(in oklab, var(--pr-accent) 14%, transparent); }
+        .pr-timeline-day-head.today .pr-timeline-day-num { color: var(--pr-accent); font-weight: 700; }
+        .pr-timeline-day-head.today .pr-timeline-day-dow { color: var(--pr-accent); }
+        .pr-timeline-day-head.weekend { background: color-mix(in oklab, var(--pr-ink) 4%, transparent); }
+
+        .pr-timeline-rows { display: flex; flex-direction: column; }
+        .pr-timeline-row {
+            min-height: 64px;
+            border-bottom: 1px solid var(--pr-line);
+        }
+        .pr-timeline-row:last-child { border-bottom: none; }
+        .pr-timeline-row-label {
+            display: flex; align-items: center; gap: 10px;
+            padding: 0 14px;
+            border-right: 1px solid var(--pr-line);
+            background: var(--pr-surface-2);
+            font-size: 13px; font-weight: 600;
+            min-width: 0;
+        }
+        .pr-timeline-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+        .pr-timeline-row-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--pr-ink); }
+        .pr-timeline-row-count {
+            font-size: 10.5px; color: var(--pr-muted);
+            background: var(--pr-surface); padding: 2px 8px; border-radius: 999px;
+            border: 1px solid var(--pr-line);
+        }
+
+        .pr-timeline-row-track {
+            position: relative;
+            display: grid;
+            grid-template-columns: repeat(14, minmax(0, 1fr));
+            min-height: 64px;
+        }
+        .pr-timeline-cell-bg {
+            border-right: 1px dashed var(--pr-line);
+        }
+        .pr-timeline-cell-bg:last-child { border-right: none; }
+        .pr-timeline-cell-bg.weekend { background: color-mix(in oklab, var(--pr-ink) 3%, transparent); }
+        .pr-timeline-cell-bg.today   { background: color-mix(in oklab, var(--pr-accent) 10%, transparent); }
+
+        .pr-timeline-bar {
+            position: absolute;
+            top: 18px;
+            height: 28px;
+            left: calc(var(--bar-idx) / 14 * 100% + 4px);
+            width: calc(1 / 14 * 100% - 8px);
+            border-radius: 8px;
+            padding: 0 10px;
+            display: flex; align-items: center;
+            color: white;
+            font-size: 11.5px; font-weight: 600;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.14);
+            cursor: pointer;
+            transition: transform 0.12s, filter 0.12s, box-shadow 0.12s;
+            min-width: 0;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        .pr-timeline-bar:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.08);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.18);
+        }
+        .pr-timeline-bar-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pr-timeline-bar.overdue {
+            outline: 2px solid var(--pr-red);
+            outline-offset: -2px;
+        }
+        .pr-timeline-bar[data-stacked="1"] { top: 50px; }
+        .pr-timeline-row[data-stacked="1"] { min-height: 88px; }
+        .pr-timeline-row[data-stacked="1"] .pr-timeline-row-track { min-height: 88px; }
+
+        .pr-timeline-empty {
+            padding: 40px; text-align: center; color: var(--pr-muted);
+            font-size: 13px;
+        }
+        .pr-timeline-legend {
+            display: flex; gap: 14px; flex-wrap: wrap;
+            padding: 10px 14px;
+            font-size: 10.5px; color: var(--pr-muted);
+            border-top: 1px solid var(--pr-line);
+            background: var(--pr-surface-2);
+        }
+        .pr-timeline-legend span { display: inline-flex; align-items: center; gap: 5px; }
+        .pr-timeline-legend .pr-legend-chip { width: 10px; height: 10px; border-radius: 3px; }
+
+        /* Dark skins: scroll track dial-down */
+        body.prism-theme.skin-mission #timelineView::-webkit-scrollbar-thumb,
+        body.prism-theme.skin-ember #timelineView::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); }
     </style>
 </head>
-<body>
+<body class="prism-theme skin-prism">
     <!-- Login Screen -->
     <div id="loginScreen" class="login-screen">
         <div class="login-box">
@@ -2219,6 +3758,7 @@
         <div id="dashboardView" class="dashboard-container"></div>
         <div id="tableView" class="groups-container hidden"></div>
         <div id="kanbanView" class="kanban-container hidden"></div>
+        <div id="timelineView" class="hidden"></div>
         <div id="calendarView" class="hidden"></div>
         <div id="notesView" class="hidden"></div>
     </div>
@@ -2399,6 +3939,38 @@
         ];
 
         let appData = { groups: [], members: [] };
+
+        // ── Flow filter (Iter 4.1) ──
+        // null = show all flows; string = show only that group's id.
+        // Set via sidebar flow-row click; cleared by top-nav "Flows" button or breadcrumb.
+        let selectedFlowId = null;
+
+        // ── Activity log (Mission variant) ──
+        // Ring buffer of the 50 most recent mutations. Persisted separately from
+        // appData so it can grow & prune independently without affecting sync.
+        const ACTIVITY_MAX = 50;
+        let activityLog = [];
+        try {
+            const saved = localStorage.getItem('flowdesk_activity');
+            if (saved) activityLog = JSON.parse(saved) || [];
+        } catch (e) { activityLog = []; }
+        function logActivity(type, detail) {
+            try {
+                activityLog.unshift({
+                    t: Date.now(),
+                    type: type || 'misc',
+                    detail: detail || ''
+                });
+                if (activityLog.length > ACTIVITY_MAX) activityLog.length = ACTIVITY_MAX;
+                localStorage.setItem('flowdesk_activity', JSON.stringify(activityLog));
+                // If Home dashboard is currently visible, refresh the activity tile inline.
+                const dashView = document.getElementById('dashboardView');
+                if (dashView && !dashView.classList.contains('hidden')) {
+                    renderActivityLogTile();
+                }
+            } catch (e) {}
+        }
+
         let calendarData = { events: [] };
         try { calendarData.events = JSON.parse(localStorage.getItem('flowdesk_events') || '[]'); } catch(e) { console.warn('Failed to parse calendar data, resetting:', e); }
         let notesData = { notes: [] };
@@ -2463,9 +4035,649 @@
             if (saved) try { appData = JSON.parse(saved); } catch (e) {}
 
             setupEventListeners();
+            // Apply saved skin BEFORE shell builds so first paint matches user preference
+            // (also cascades legacy CSS vars so Kanban/Table/Notes adopt the skin palette).
+            const savedSkin = (() => { try { return localStorage.getItem('flowdesk_skin') || 'prism'; } catch (e) { return 'prism'; } })();
+            setPrismSkin(savedSkin, { persist: false });
+            buildPrismShell();      // Prism Iteration 1: wrap UI with sidebar+main shell
             renderApp();
             syncData('quick');
         }
+
+        // ── Prism shell builder (Iteration 1) ──
+        // Creates the left sidebar + top bar and moves existing view divs into the new main area.
+        // Legacy <header> / .summary-bar / .view-tabs remain in DOM (for event bindings) but are
+        // hidden via CSS (body.prism-theme overrides).
+        function buildPrismShell() {
+            if (!document.body.classList.contains('prism-theme')) return;
+            if (document.querySelector('.prism-shell')) return;  // already built
+
+            const mainApp = document.getElementById('mainApp');
+            if (!mainApp) return;
+
+            // Build shell
+            const shell = document.createElement('div');
+            shell.className = 'prism-shell';
+
+            // Sidebar
+            const sidebar = document.createElement('aside');
+            sidebar.className = 'prism-sidebar';
+            sidebar.innerHTML = `
+                <div class="prism-brand">
+                    <div class="prism-brand-mark">F</div>
+                    <div class="prism-brand-name">Flowdesk</div>
+                </div>
+                <button class="prism-search-stub" id="prismSearchStub" type="button">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                    <span>Jump to…</span>
+                    <span class="pr-kbd">⌘K</span>
+                </button>
+                <nav class="prism-nav" id="prismNav">
+                    <button class="prism-nav-item" data-view="dashboard" id="prismNavHome">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>
+                        Home
+                    </button>
+                    <button class="prism-nav-item" data-view="table" id="prismNavFlows">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+                        Flows
+                    </button>
+                    <button class="prism-nav-item" data-view="kanban" id="prismNavBoard">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="5" height="14" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/></svg>
+                        Board
+                    </button>
+                    <button class="prism-nav-item" data-view="timeline" id="prismNavTimeline">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h12M3 12h18M3 18h8"/><circle cx="17" cy="6" r="1.5" fill="currentColor"/><circle cx="22" cy="12" r="1.5" fill="currentColor"/><circle cx="13" cy="18" r="1.5" fill="currentColor"/></svg>
+                        Timeline
+                    </button>
+                    <button class="prism-nav-item" data-view="calendar" id="prismNavCal">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>
+                        Calendar
+                    </button>
+                    <button class="prism-nav-item" data-view="notes" id="prismNavNotes">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>
+                        Notes
+                    </button>
+                </nav>
+                <div class="prism-section">
+                    <div class="prism-section-label">Flows</div>
+                    <div id="prismFlowsList"></div>
+                </div>
+                <div class="prism-user-card">
+                    <div class="prism-avatar">K</div>
+                    <div style="min-width:0;">
+                        <div class="prism-user-name">Kevin</div>
+                        <div class="prism-user-sub">Local · synced</div>
+                    </div>
+                </div>
+            `;
+
+            // Topbar
+            const topbar = document.createElement('div');
+            topbar.className = 'prism-topbar';
+            topbar.innerHTML = `
+                <input type="text" class="prism-topbar-search" id="prismSearchBox" placeholder="Search tasks…">
+                <div class="prism-topbar-actions">
+                    <button class="prism-btn prism-btn-ghost" id="prismSyncBtn" title="Quick sync">
+                        <span class="prism-sync-dot" id="prismSyncDot"></span>
+                        Sync
+                    </button>
+                    <button class="prism-btn prism-btn-ghost" id="prismFullSyncBtn" title="Full sync (tasks + events + notes content)">Full Sync</button>
+                    <button class="prism-btn prism-btn-primary" id="prismNewTaskBtn">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                        New task
+                    </button>
+                    <div class="prism-skin-picker" id="prismSkinPicker">
+                        <button class="prism-skin-trigger" id="prismSkinBtn" title="Change skin" aria-haspopup="true" aria-expanded="false">
+                            <span class="prism-skin-swatch-ring"></span>
+                            <span id="prismSkinBtnLabel">Prism</span>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="prism-skin-menu" id="prismSkinMenu" role="menu">
+                            <div class="prism-skin-menu-label">Skin</div>
+                            <button class="prism-skin-option" data-skin="prism" role="menuitem">
+                                <span class="prism-skin-swatch skin-prism"></span>
+                                <span class="prism-skin-option-text">
+                                    <span class="prism-skin-option-name">Prism</span>
+                                    <span class="prism-skin-option-sub">Bento · indigo · soft</span>
+                                </span>
+                                <span class="pr-check">✓</span>
+                            </button>
+                            <button class="prism-skin-option" data-skin="atlas" role="menuitem">
+                                <span class="prism-skin-swatch skin-atlas"></span>
+                                <span class="prism-skin-option-text">
+                                    <span class="prism-skin-option-name">Atlas</span>
+                                    <span class="prism-skin-option-sub">Editorial · warm paper · serif</span>
+                                </span>
+                                <span class="pr-check">✓</span>
+                            </button>
+                            <button class="prism-skin-option" data-skin="mission" role="menuitem">
+                                <span class="prism-skin-swatch skin-mission"></span>
+                                <span class="prism-skin-option-text">
+                                    <span class="prism-skin-option-name">Mission</span>
+                                    <span class="prism-skin-option-sub">Operator · graphite · amber</span>
+                                </span>
+                                <span class="pr-check">✓</span>
+                            </button>
+                            <button class="prism-skin-option" data-skin="horizon" role="menuitem">
+                                <span class="prism-skin-swatch skin-horizon"></span>
+                                <span class="prism-skin-option-text">
+                                    <span class="prism-skin-option-name">Horizon</span>
+                                    <span class="prism-skin-option-sub">Sage · clay · timeline</span>
+                                </span>
+                                <span class="pr-check">✓</span>
+                            </button>
+                            <button class="prism-skin-option" data-skin="ember" role="menuitem">
+                                <span class="prism-skin-swatch skin-ember"></span>
+                                <span class="prism-skin-option-text">
+                                    <span class="prism-skin-option-name">Ember</span>
+                                    <span class="prism-skin-option-sub">Dark focus · teal · serif</span>
+                                </span>
+                                <span class="pr-check">✓</span>
+                            </button>
+                        </div>
+                    </div>
+                    <button class="prism-btn prism-btn-ghost prism-btn-icon" id="prismMoreBtn" title="More">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+                    </button>
+                </div>
+            `;
+
+            // Main: topbar + (views moved in)
+            const main = document.createElement('main');
+            main.className = 'prism-main';
+            main.appendChild(topbar);
+
+            const pageWrap = document.createElement('div');
+            pageWrap.className = 'prism-page';
+            pageWrap.id = 'prismPageWrap';
+
+            // Move existing view divs into page wrap
+            const legacyContainer = mainApp.querySelector('.container');
+            if (legacyContainer) {
+                ['dashboardView','tableView','kanbanView','timelineView','calendarView','notesView'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) pageWrap.appendChild(el);
+                });
+            }
+            main.appendChild(pageWrap);
+
+            // Status footer (Mission variant)
+            const footer = document.createElement('div');
+            footer.className = 'prism-status-footer';
+            footer.id = 'prismStatusFooter';
+            footer.innerHTML = `
+                <span class="status-item status-clickable" id="prismFooterSyncWrap" title="Click to sync now (⌘/)"><span class="status-dot" id="prismFooterDot"></span><span id="prismFooterSync">synced</span></span>
+                <span class="status-sep">·</span>
+                <span class="status-item" id="prismFooterAgo">—</span>
+                <span class="status-sep">·</span>
+                <span class="status-item" id="prismFooterTasks">0 tasks</span>
+                <span class="status-sep">·</span>
+                <span class="status-item" id="prismFooterFlows">0 flows</span>
+                <span class="status-sep">·</span>
+                <span class="status-item status-clickable" id="prismFooterFocusBtn" title="Enter Focus mode (⌘⇧F)"><span class="status-dot" style="background:var(--pr-accent);animation:none;"></span>focus</span>
+                <span class="status-hint" id="prismFooterHint" title="Type g then h/f/b/t/c/n to navigate">g · ?</span>
+                <span class="status-version">Flowdesk v2.4</span>
+            `;
+            main.appendChild(footer);
+            // Footer interactions
+            const fSyncWrap = document.getElementById('prismFooterSyncWrap');
+            if (fSyncWrap) fSyncWrap.addEventListener('click', () => { if (typeof syncData === 'function') syncData('quick'); });
+            const fFocusBtn = document.getElementById('prismFooterFocusBtn');
+            if (fFocusBtn) fFocusBtn.addEventListener('click', () => { enterFocusMode(); });
+
+            shell.appendChild(sidebar);
+            shell.appendChild(main);
+
+            // Insert shell at top of mainApp
+            mainApp.insertBefore(shell, mainApp.firstChild);
+
+            // Wire nav buttons to switchView (also updates legacy .view-tab active)
+            document.querySelectorAll('.prism-nav-item').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const view = btn.dataset.view;
+                    // Clicking the top-level "Flows" nav always clears the flow filter
+                    // (sidebar rows underneath are what set it)
+                    if (view === 'table') {
+                        selectedFlowId = null;
+                        if (typeof renderPrismSidebar === 'function') renderPrismSidebar();
+                    }
+                    switchView(view);
+                    syncPrismNavActive(view);
+                });
+            });
+
+            // Wire topbar actions to legacy handlers
+            const tsb = document.getElementById('prismSearchBox');
+            if (tsb) tsb.addEventListener('input', (e) => {
+                const legacy = document.getElementById('searchBox');
+                if (legacy) { legacy.value = e.target.value; legacy.dispatchEvent(new Event('input')); }
+            });
+            document.getElementById('prismSyncBtn').addEventListener('click', () => syncData('quick'));
+            document.getElementById('prismFullSyncBtn').addEventListener('click', () => syncData('full'));
+            document.getElementById('prismNewTaskBtn').addEventListener('click', addNewTask);
+            document.getElementById('prismMoreBtn').addEventListener('click', openPrismMore);
+
+            // Topbar shadow on scroll (scroll container is pageWrap under the new flex layout)
+            pageWrap.addEventListener('scroll', () => {
+                if (pageWrap.scrollTop > 4) topbar.classList.add('scrolled');
+                else topbar.classList.remove('scrolled');
+            });
+
+            // Skin picker wiring
+            const skinBtn = document.getElementById('prismSkinBtn');
+            const skinMenu = document.getElementById('prismSkinMenu');
+            if (skinBtn && skinMenu) {
+                skinBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const open = skinMenu.classList.toggle('open');
+                    skinBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                });
+                document.querySelectorAll('.prism-skin-option').forEach(opt => {
+                    opt.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        setPrismSkin(opt.dataset.skin, { persist: true });
+                        skinMenu.classList.remove('open');
+                        skinBtn.setAttribute('aria-expanded', 'false');
+                    });
+                });
+                // Close on outside click / Escape
+                document.addEventListener('click', (e) => {
+                    if (!skinMenu.contains(e.target) && !skinBtn.contains(e.target)) {
+                        skinMenu.classList.remove('open');
+                        skinBtn.setAttribute('aria-expanded', 'false');
+                    }
+                });
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && skinMenu.classList.contains('open')) {
+                        skinMenu.classList.remove('open');
+                        skinBtn.setAttribute('aria-expanded', 'false');
+                        skinBtn.focus();
+                    }
+                });
+            }
+            // Apply saved skin (or current default) to update label + active state
+            const savedSkin = (() => { try { return localStorage.getItem('flowdesk_skin') || 'prism'; } catch (e) { return 'prism'; } })();
+            setPrismSkin(savedSkin, { persist: false });
+
+            // Start on Home
+            syncPrismNavActive('dashboard');
+            renderPrismSidebar();
+            updatePrismStatusFooter();
+
+            // Build Focus mode overlay (Ember variant) once, kept hidden until ⌘⇧F
+            buildFocusOverlay();
+        }
+
+        // ── Focus mode (Ember variant) ──
+        // Full-screen single-task overlay with 50-min timer + queue.
+        // Toggled by ⌘⇧F. Works in every skin — Ember / Atlas render the
+        // title in serif via CSS skin-gating. State persists only while overlay open.
+        const FOCUS_TOTAL_SEC = 50 * 60;
+        let focusTaskId = null;
+        let focusTimerSec = FOCUS_TOTAL_SEC;
+        let focusTimerInterval = null;
+        let focusPaused = false;
+        function buildFocusOverlay() {
+            if (document.getElementById('prismFocusOverlay')) return;
+            const ov = document.createElement('div');
+            ov.id = 'prismFocusOverlay';
+            ov.className = 'prism-focus-overlay';
+            ov.innerHTML = `
+                <div class="prism-focus-topbar">
+                    <div class="prism-focus-brand">Focus session</div>
+                    <button class="prism-focus-exit" id="focusExitBtn" title="Exit focus (Esc / ⌘⇧F)">Exit <kbd style="margin-left:6px;font-family:var(--pr-mono);background:var(--pr-surface-2);padding:1px 5px;border-radius:4px;">Esc</kbd></button>
+                </div>
+                <div class="prism-focus-body">
+                    <div class="prism-focus-eyebrow">
+                        <span class="pr-focus-dot" id="focusFlowDot" style="background:var(--pr-accent)"></span>
+                        <span id="focusFlowName">—</span>
+                        <span style="opacity:0.5;">·</span>
+                        <span id="focusDueLabel">no due date</span>
+                    </div>
+                    <h1 class="prism-focus-title" id="focusTitle">Nothing selected</h1>
+                    <div class="prism-focus-blocker" id="focusBlocker">Blocker — this task is Stuck</div>
+                    <div class="prism-focus-meta" id="focusMeta"></div>
+                    <div class="prism-focus-notes" id="focusNotes"></div>
+                    <div class="prism-focus-timer" id="focusTimer">50:00</div>
+                    <div class="prism-focus-timer-label" id="focusTimerLabel">running · click to pause</div>
+                    <div class="prism-focus-actions">
+                        <button class="pr-focus-btn primary" id="focusDoneBtn" title="Mark task done + next">Done <kbd>⌘⏎</kbd></button>
+                        <button class="pr-focus-btn" id="focusSkipBtn" title="Skip to next task">Skip <kbd>→</kbd></button>
+                        <button class="pr-focus-btn danger" id="focusStuckBtn" title="Mark as stuck">Stuck <kbd>S</kbd></button>
+                        <button class="pr-focus-btn" id="focusPauseBtn" title="Pause / resume timer">Pause <kbd>Space</kbd></button>
+                    </div>
+                </div>
+                <div class="prism-focus-queue">
+                    <div class="prism-focus-queue-title">Up next</div>
+                    <div id="focusQueue"></div>
+                </div>
+            `;
+            document.body.appendChild(ov);
+            document.getElementById('focusExitBtn').addEventListener('click', exitFocusMode);
+            document.getElementById('focusDoneBtn').addEventListener('click', () => focusMarkStatus('Done'));
+            document.getElementById('focusSkipBtn').addEventListener('click', focusNextTask);
+            document.getElementById('focusStuckBtn').addEventListener('click', () => focusMarkStatus('Stuck'));
+            document.getElementById('focusPauseBtn').addEventListener('click', toggleFocusPause);
+            // Clicking the timer also toggles pause
+            document.getElementById('focusTimer').addEventListener('click', toggleFocusPause);
+        }
+        function focusCandidateTasks() {
+            // Undone tasks sorted by due date (earliest first, no date last)
+            const all = (appData.groups || []).flatMap(g => (g.tasks || []).map(t => ({...t, groupName: g.title, groupColor: g.color, groupId: g.id})));
+            return all
+                .filter(t => t.status !== 'Done')
+                .sort((a, b) => {
+                    const ad = a.dueDate || '9999-12-31';
+                    const bd = b.dueDate || '9999-12-31';
+                    return ad.localeCompare(bd);
+                });
+        }
+        function enterFocusMode(startTaskId) {
+            buildFocusOverlay();
+            const ov = document.getElementById('prismFocusOverlay');
+            if (!ov) return;
+            const candidates = focusCandidateTasks();
+            if (candidates.length === 0) {
+                alert('No open tasks — add one first.');
+                return;
+            }
+            focusTaskId = startTaskId && candidates.find(t => t.id === startTaskId) ? startTaskId : candidates[0].id;
+            focusTimerSec = FOCUS_TOTAL_SEC;
+            focusPaused = false;
+            ov.classList.add('visible');
+            document.body.style.overflow = 'hidden';
+            renderFocusBody();
+            startFocusTimer();
+            logActivity('FOCUS', `Started ${candidates.find(t => t.id === focusTaskId).name}`);
+        }
+        function exitFocusMode() {
+            const ov = document.getElementById('prismFocusOverlay');
+            if (!ov || !ov.classList.contains('visible')) return;
+            ov.classList.remove('visible');
+            document.body.style.overflow = '';
+            stopFocusTimer();
+            focusTaskId = null;
+        }
+        function startFocusTimer() {
+            stopFocusTimer();
+            focusTimerInterval = setInterval(() => {
+                if (focusPaused) return;
+                focusTimerSec--;
+                updateFocusTimerDisplay();
+                if (focusTimerSec <= 0) {
+                    stopFocusTimer();
+                    logActivity('FOCUS', '50-minute session complete');
+                    // Gentle completion — keep overlay open; user can hit Done/Next
+                    const tl = document.getElementById('focusTimerLabel');
+                    if (tl) tl.textContent = 'session complete — take a break';
+                    focusPaused = true;
+                    try { new Audio().play(); } catch(e) {}
+                }
+            }, 1000);
+        }
+        function stopFocusTimer() {
+            if (focusTimerInterval) { clearInterval(focusTimerInterval); focusTimerInterval = null; }
+        }
+        function toggleFocusPause() {
+            focusPaused = !focusPaused;
+            const timer = document.getElementById('focusTimer');
+            const label = document.getElementById('focusTimerLabel');
+            const btn = document.getElementById('focusPauseBtn');
+            if (timer) timer.classList.toggle('paused', focusPaused);
+            if (label) label.textContent = focusPaused ? 'paused · click to resume' : 'running · click to pause';
+            if (btn) btn.firstChild.nodeValue = focusPaused ? 'Resume ' : 'Pause ';
+        }
+        function updateFocusTimerDisplay() {
+            const t = document.getElementById('focusTimer');
+            if (!t) return;
+            const s = Math.max(0, focusTimerSec);
+            const mm = String(Math.floor(s / 60)).padStart(2, '0');
+            const ss = String(s % 60).padStart(2, '0');
+            t.textContent = `${mm}:${ss}`;
+        }
+        function focusFindTask(id) {
+            for (const g of (appData.groups || [])) {
+                const t = (g.tasks || []).find(tt => tt.id === id);
+                if (t) return { task: t, group: g };
+            }
+            return null;
+        }
+        function renderFocusBody() {
+            const found = focusFindTask(focusTaskId);
+            if (!found) { exitFocusMode(); return; }
+            const { task, group } = found;
+            const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            document.getElementById('focusTitle').textContent = task.name || 'Untitled';
+            document.getElementById('focusFlowName').textContent = group.title;
+            document.getElementById('focusFlowDot').style.background = group.color || '#999';
+            const dueLabel = task.dueDate ? prismRelativeDay(task.dueDate) : 'no due date';
+            document.getElementById('focusDueLabel').textContent = dueLabel;
+            // Blocker callout
+            document.getElementById('focusBlocker').classList.toggle('visible', task.status === 'Stuck');
+            // Meta
+            const meta = [];
+            const prioHtml = prismPrioHtml(task.priority);
+            if (prioHtml) meta.push(`<span class="meta-item">${prioHtml}<span style="margin-left:6px;">${esc(task.priority)} priority</span></span>`);
+            if (task.status && task.status !== 'Done') meta.push(`<span class="meta-item"><span class="meta-dot" style="background:${STATUS_COLORS[task.status] || 'var(--pr-muted)'}"></span>${esc(task.status)}</span>`);
+            if (task.progress) meta.push(`<span class="meta-item">${task.progress}% done</span>`);
+            document.getElementById('focusMeta').innerHTML = meta.join('');
+            // Notes preview
+            const notesText = (task.notes || '').replace(/<[^>]+>/g, '').trim();
+            document.getElementById('focusNotes').textContent = notesText ? notesText.slice(0, 400) : '';
+            // Timer
+            updateFocusTimerDisplay();
+            // Queue: next undone tasks, highlight current
+            const candidates = focusCandidateTasks();
+            const runningIdx = candidates.findIndex(t => t.id === focusTaskId);
+            const q = candidates.slice(0, 8);
+            const queueEl = document.getElementById('focusQueue');
+            queueEl.innerHTML = q.map(t => {
+                const running = t.id === focusTaskId;
+                const icon = running ? '▶' : (t.status === 'Stuck' ? '✕' : (t.status === 'Done' ? '✓' : '○'));
+                const iconCls = running ? 'running' : (t.status === 'Stuck' ? 'stuck' : (t.status === 'Done' ? 'done' : ''));
+                const rowCls = t.status === 'Done' ? 'done' : '';
+                const due = t.dueDate ? prismRelativeDay(t.dueDate) : '';
+                return `<div class="prism-focus-q-row ${rowCls}" data-tid="${esc(t.id)}">
+                    <span class="prism-focus-q-icon ${iconCls}">${icon}</span>
+                    <span class="prism-focus-q-name">${esc(t.name)}</span>
+                    <span class="prism-focus-q-sub">${due || t.groupName}</span>
+                </div>`;
+            }).join('');
+            queueEl.querySelectorAll('.prism-focus-q-row').forEach(r => {
+                r.addEventListener('click', () => {
+                    focusTaskId = r.dataset.tid;
+                    focusTimerSec = FOCUS_TOTAL_SEC;
+                    if (focusPaused) toggleFocusPause();
+                    renderFocusBody();
+                });
+            });
+        }
+        function focusMarkStatus(newStatus) {
+            const found = focusFindTask(focusTaskId);
+            if (!found) return;
+            logActivity(newStatus === 'Done' ? 'DONE' : 'STUCK', `${found.task.name} → ${newStatus}`);
+            found.task.status = newStatus;
+            debouncedSync();
+            renderApp();
+            focusNextTask();
+        }
+        function focusNextTask() {
+            const candidates = focusCandidateTasks();
+            if (candidates.length === 0) { exitFocusMode(); return; }
+            const idx = candidates.findIndex(t => t.id === focusTaskId);
+            const next = candidates[(idx + 1) % candidates.length];
+            // If we wrapped back to same task and it's the last open one, just exit.
+            if (next.id === focusTaskId && candidates.length === 1) {
+                exitFocusMode();
+                return;
+            }
+            focusTaskId = next.id;
+            focusTimerSec = FOCUS_TOTAL_SEC;
+            renderFocusBody();
+        }
+
+        // ── Skin switcher ──
+        // Applies body.skin-{name} class, cascades matching legacy CSS custom props
+        // (--bg / --card-bg / --text / etc.) and toggles body.dark so that the rest of
+        // Flowdesk's legacy UI (Kanban cards, notes editor, scrollbars, etc.) adopts
+        // the chosen palette — not just the new Prism shell.
+        const PRISM_SKIN_MAP = {
+            prism:   { bg:'#EEF0F5', sidebar:'#F4F5F9', text:'#1B1D2B', textDim:'#6B6F82', border:'#E2E4EC', accent:'#4A5CC9', editor:'#FFFFFF', card:'#FFFFFF', cardHover:'#F4F5F9', toolbar:'#F4F5F9', codeBlock:'#F4F5F9', isDark:false },
+            atlas:   { bg:'#F4EFE7', sidebar:'#F0EADF', text:'#2C2419', textDim:'#7A6F5F', border:'#E3DBCB', accent:'#B24A2D', editor:'#FBF7EF', card:'#FBF7EF', cardHover:'#F0EADF', toolbar:'#F0EADF', codeBlock:'#F0EADF', isDark:false },
+            mission: { bg:'#141516', sidebar:'#1B1D1F', text:'#E8E6E1', textDim:'#8A8680', border:'#2B2E31', accent:'#E89A3C', editor:'#1B1D1F', card:'#222527', cardHover:'#2B2E31', toolbar:'#1B1D1F', codeBlock:'#0F1011', isDark:true  },
+            horizon: { bg:'#F0EDE6', sidebar:'#E8E4DA', text:'#23302A', textDim:'#6B7A72', border:'#D8D3C7', accent:'#7B9880', editor:'#FAF8F3', card:'#FAF8F3', cardHover:'#E8E4DA', toolbar:'#E8E4DA', codeBlock:'#E8E4DA', isDark:false },
+            ember:   { bg:'#0F1512', sidebar:'#141B17', text:'#E8E4DA', textDim:'#7E8A82', border:'#233028', accent:'#5FB39A', editor:'#141B17', card:'#1A221D', cardHover:'#233028', toolbar:'#141B17', codeBlock:'#0B100D', isDark:true  },
+        };
+        function setPrismSkin(name, opts) {
+            const skins = Object.keys(PRISM_SKIN_MAP);
+            if (!skins.includes(name)) name = 'prism';
+            skins.forEach(s => document.body.classList.remove('skin-' + s));
+            document.body.classList.add('skin-' + name);
+
+            // Cascade to legacy CSS vars so Kanban/Table/Notes/editor pick up the palette
+            const t = PRISM_SKIN_MAP[name];
+            const root = document.documentElement;
+            root.style.setProperty('--bg', t.bg);
+            root.style.setProperty('--sidebar-bg', t.sidebar);
+            root.style.setProperty('--text', t.text);
+            root.style.setProperty('--text-dim', t.textDim);
+            root.style.setProperty('--border', t.border);
+            root.style.setProperty('--accent', t.accent);
+            root.style.setProperty('--editor-bg', t.editor);
+            root.style.setProperty('--card-bg', t.card);
+            root.style.setProperty('--card-hover', t.cardHover);
+            root.style.setProperty('--toolbar-bg', t.toolbar);
+            root.style.setProperty('--code-bg', t.codeBlock);
+            document.body.classList.toggle('dark', t.isDark);
+            document.body.classList.toggle('dark-mode', t.isDark);
+
+            if (opts && opts.persist) {
+                try { localStorage.setItem('flowdesk_skin', name); } catch (e) {}
+            }
+            const label = document.getElementById('prismSkinBtnLabel');
+            if (label) label.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+            document.querySelectorAll('.prism-skin-option').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.skin === name);
+            });
+        }
+
+        function syncPrismNavActive(view) {
+            document.querySelectorAll('.prism-nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+        }
+
+        function renderPrismSidebar() {
+            const list = document.getElementById('prismFlowsList');
+            if (!list) return;
+            const groups = (appData && appData.groups) ? appData.groups : [];
+            if (groups.length === 0) {
+                list.innerHTML = `<div class="prism-empty" style="padding:10px 12px;text-align:left;">No flows yet</div>`;
+                return;
+            }
+            // "All flows" pseudo-row at top so user can clear the filter from the sidebar
+            const allActive = !selectedFlowId ? ' active' : '';
+            let html = `<div class="prism-flow-row prism-flow-row-all${allActive}" data-gid="">
+                <span class="prism-flow-dot" style="background:linear-gradient(135deg,var(--pr-accent),var(--pr-accent-2, var(--pr-amber)));"></span>
+                <span class="prism-flow-name">All flows</span>
+                <span class="prism-flow-count">${groups.reduce((n,g)=>n+(g.tasks||[]).length,0)}</span>
+            </div>`;
+            html += groups.map(g => {
+                const count = (g.tasks || []).length;
+                const safe = (g.title || '').replace(/</g, '&lt;');
+                const active = (selectedFlowId === g.id) ? ' active' : '';
+                return `<div class="prism-flow-row${active}" data-gid="${g.id}">
+                    <span class="prism-flow-dot" style="background:${g.color || '#999'}"></span>
+                    <span class="prism-flow-name">${safe}</span>
+                    <span class="prism-flow-count">${count}</span>
+                </div>`;
+            }).join('');
+            list.innerHTML = html;
+            // Click a flow row → set filter and jump to Table view
+            list.querySelectorAll('.prism-flow-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    const gid = row.dataset.gid || null;
+                    selectedFlowId = gid;
+                    switchView('table');
+                    syncPrismNavActive('table');
+                    renderPrismSidebar();  // refresh active highlight
+                });
+            });
+        }
+
+        function openPrismMore() {
+            // Simple popup of the legacy toolbar actions
+            const existing = document.getElementById('prismMoreMenu');
+            if (existing) { existing.remove(); return; }
+            const menu = document.createElement('div');
+            menu.id = 'prismMoreMenu';
+            menu.style.cssText = 'position:fixed;top:58px;right:28px;z-index:9999;background:var(--pr-surface);border-radius:10px;box-shadow:var(--pr-shadow-lg);padding:6px;min-width:180px;font-size:13px;';
+            const items = [
+                { label: 'Expand all groups', fn: () => document.getElementById('expandAllBtn')?.click() },
+                { label: 'Collapse all', fn: () => document.getElementById('collapseAllBtn')?.click() },
+                { label: 'Export JSON', fn: () => document.getElementById('exportBtn')?.click() },
+                { label: 'Import JSON', fn: () => document.getElementById('importBtn')?.click() },
+                { label: 'Reset data', fn: () => document.getElementById('resetBtn')?.click(), danger: true },
+            ];
+            menu.innerHTML = items.map((it, i) => `<button class="prism-more-item" data-i="${i}" style="display:block;width:100%;text-align:left;padding:8px 12px;border:none;background:none;border-radius:7px;color:${it.danger ? 'var(--pr-red)' : 'var(--pr-ink)'};font-size:12.5px;cursor:pointer;">${it.label}</button>`).join('');
+            document.body.appendChild(menu);
+            menu.querySelectorAll('.prism-more-item').forEach((b, i) => {
+                b.addEventListener('mouseenter', () => b.style.background = 'var(--pr-surface-2)');
+                b.addEventListener('mouseleave', () => b.style.background = 'none');
+                b.addEventListener('click', () => { items[i].fn(); menu.remove(); });
+            });
+            // Dismiss on outside click
+            const dismiss = (e) => { if (!menu.contains(e.target) && e.target.id !== 'prismMoreBtn') { menu.remove(); document.removeEventListener('click', dismiss); } };
+            setTimeout(() => document.addEventListener('click', dismiss), 10);
+        }
+
+        // Keep Prism sync dot in sync with legacy indicator (helper — called from updateSyncIndicator)
+        let prismLastSyncedAt = 0;
+        function updatePrismSyncDot(state) {
+            const dot = document.getElementById('prismSyncDot');
+            if (dot) {
+                dot.classList.remove('syncing', 'error');
+                if (state === 'syncing') dot.classList.add('syncing');
+                if (state === 'error') dot.classList.add('error');
+            }
+            // Mission-style footer mirrors the same state
+            const fdot = document.getElementById('prismFooterDot');
+            const flabel = document.getElementById('prismFooterSync');
+            if (fdot && flabel) {
+                fdot.classList.remove('syncing', 'error');
+                if (state === 'syncing') {
+                    fdot.classList.add('syncing');
+                    flabel.textContent = 'syncing';
+                } else if (state === 'error') {
+                    fdot.classList.add('error');
+                    flabel.textContent = 'sync failed';
+                } else if (state === 'synced' || state === 'ok' || !state) {
+                    flabel.textContent = 'synced';
+                    prismLastSyncedAt = Date.now();
+                }
+            }
+            updatePrismStatusFooter();
+        }
+        function updatePrismStatusFooter() {
+            const ago = document.getElementById('prismFooterAgo');
+            const tasks = document.getElementById('prismFooterTasks');
+            const flows = document.getElementById('prismFooterFlows');
+            if (ago) {
+                if (prismLastSyncedAt === 0) {
+                    ago.textContent = 'not synced yet';
+                } else {
+                    ago.textContent = prismRelativeTime(prismLastSyncedAt) + ' ago';
+                }
+            }
+            if (tasks || flows) {
+                const groups = (appData && appData.groups) ? appData.groups : [];
+                const totalTasks = groups.reduce((n, g) => n + (g.tasks || []).length, 0);
+                if (tasks) tasks.textContent = totalTasks + ' task' + (totalTasks === 1 ? '' : 's');
+                if (flows) flows.textContent = groups.length + ' flow' + (groups.length === 1 ? '' : 's');
+            }
+        }
+        // Tick the footer so "Xs ago" stays fresh
+        setInterval(() => {
+            if (document.getElementById('prismFooterAgo')) updatePrismStatusFooter();
+        }, 10000);
 
         document.addEventListener('DOMContentLoaded', () => {
             setTheme(currentTheme);
@@ -2475,6 +4687,136 @@
             }
             // Otherwise show login screen (default)
         });
+
+        // ── Vim-style g-then-X navigation (Mission variant) ──
+        // Press "g" then one of: h (home) / f (flows) / b (board) / t (timeline)
+        // / c (calendar) / n (notes). Two-stroke with 1.2s timeout.
+        let gPressedAt = 0;
+        let gHintEl = null;
+        function showGHint(msg) {
+            if (!gHintEl) {
+                gHintEl = document.createElement('div');
+                gHintEl.className = 'prism-gmode-hint';
+                document.body.appendChild(gHintEl);
+            }
+            gHintEl.textContent = msg || 'g — h home · f flows · b board · t timeline · c calendar · n notes';
+            gHintEl.classList.add('visible');
+        }
+        function hideGHint() {
+            if (gHintEl) gHintEl.classList.remove('visible');
+        }
+        document.addEventListener('keydown', (e) => {
+            // Only fire when Prism shell is active
+            if (!document.body.classList.contains('prism-theme')) return;
+            const tag = (e.target && e.target.tagName) || '';
+            const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' ||
+                               (e.target && e.target.isContentEditable);
+
+            // Global ⌘K / Ctrl+K → focus top search (only when NOT in editor — notes editor owns ⌘K for link)
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k' && !e.shiftKey && !isEditable) {
+                const searchBox = document.getElementById('prismSearchBox');
+                if (searchBox) {
+                    e.preventDefault();
+                    searchBox.focus();
+                    searchBox.select();
+                    return;
+                }
+            }
+            // Global ⌘N / Ctrl+N → new task (only when not typing)
+            if ((e.metaKey || e.ctrlKey) && e.key === 'n' && !e.shiftKey && !isEditable) {
+                e.preventDefault();
+                addNewTask();
+                return;
+            }
+            // Global ⌘/ / Ctrl+/ → quick sync
+            if ((e.metaKey || e.ctrlKey) && e.key === '/' && !isEditable) {
+                e.preventDefault();
+                syncData('quick');
+                return;
+            }
+            // Global ⌘⇧T / Ctrl+Shift+T → cycle skin
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'T' || e.key === 't')) {
+                e.preventDefault();
+                const order = ['prism','atlas','mission','horizon','ember'];
+                const current = (document.body.className.match(/skin-(\w+)/) || [])[1] || 'prism';
+                const next = order[(order.indexOf(current) + 1) % order.length];
+                setPrismSkin(next, { persist: true });
+                return;
+            }
+            // Global ⌘⇧F / Ctrl+Shift+F → toggle Focus mode (Ember variant)
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+                e.preventDefault();
+                const ovFocus = document.getElementById('prismFocusOverlay');
+                if (ovFocus && ovFocus.classList.contains('visible')) {
+                    exitFocusMode();
+                } else {
+                    enterFocusMode();
+                }
+                return;
+            }
+            // Focus-mode-only shortcuts (only when the focus overlay is visible)
+            const ovFocusActive = document.getElementById('prismFocusOverlay');
+            const focusOpen = ovFocusActive && ovFocusActive.classList.contains('visible');
+            if (focusOpen && !isEditable) {
+                // Esc → exit
+                if (e.key === 'Escape') { e.preventDefault(); exitFocusMode(); return; }
+                // Space → pause/resume
+                if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); toggleFocusPause(); return; }
+                // → / n → next task (skip)
+                if (e.key === 'ArrowRight' || e.key === 'n') { e.preventDefault(); focusNextTask(); return; }
+                // s → stuck
+                if (e.key === 's' || e.key === 'S') { e.preventDefault(); focusMarkStatus('Stuck'); return; }
+                // ⌘⏎ → done
+                if ((e.metaKey || e.ctrlKey) && (e.key === 'Enter' || e.key === 'Return')) {
+                    e.preventDefault();
+                    focusMarkStatus('Done');
+                    return;
+                }
+            }
+
+            if (isEditable) return;
+            if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+            const now = Date.now();
+            const withinWindow = (now - gPressedAt) < 1200;
+
+            // First stroke: 'g'
+            if (e.key === 'g' && !withinWindow) {
+                gPressedAt = now;
+                showGHint();
+                e.preventDefault();
+                return;
+            }
+
+            // Second stroke within window
+            if (withinWindow) {
+                const map = { h: 'dashboard', f: 'table', b: 'kanban', t: 'timeline', c: 'calendar', n: 'notes' };
+                const dest = map[e.key.toLowerCase()];
+                gPressedAt = 0;
+                hideGHint();
+                if (dest) {
+                    e.preventDefault();
+                    switchView(dest);
+                    syncPrismNavActive(dest);
+                } else if (e.key === 'Escape') {
+                    // cancel silently
+                }
+                return;
+            }
+
+            // Escape hides hint if somehow stuck
+            if (e.key === 'Escape' && gHintEl && gHintEl.classList.contains('visible')) {
+                gPressedAt = 0;
+                hideGHint();
+            }
+        });
+        // Auto-timeout for g prefix
+        setInterval(() => {
+            if (gPressedAt && Date.now() - gPressedAt > 1200) {
+                gPressedAt = 0;
+                hideGHint();
+            }
+        }, 400);
 
         function setupEventListeners() {
             document.getElementById('newTaskBtn').addEventListener('click', addNewTask);
@@ -2609,6 +4951,7 @@
 
         function updateSyncIndicator(state) {
             document.getElementById('syncIndicator').className = 'sync-indicator ' + state;
+            if (typeof updatePrismSyncDot === 'function') updatePrismSyncDot(state);
         }
 
         function debouncedSync() {
@@ -2694,7 +5037,7 @@
                 return;
             }
             const group = appData.groups[0];
-            group.tasks.push({
+            const newTask = {
                 id: 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
                 name: 'New Task',
                 status: 'Not Started',
@@ -2707,7 +5050,9 @@
                 subtasks: [],
                 labels: [],
                 comments: []
-            });
+            };
+            group.tasks.push(newTask);
+            logActivity('ADD', `${newTask.name} → ${group.title}`);
             debouncedSync();
             renderApp();
         }
@@ -2763,10 +5108,13 @@
         }
 
         function switchView(view) {
+            // 'timeline' is a Prism-only view — legacy .view-tab has no tab for it, so be defensive
             document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
-            document.querySelector(`.view-tab[data-view="${view}"]`).classList.add('active');
-            ['dashboardView', 'tableView', 'kanbanView', 'calendarView', 'notesView'].forEach(id => {
-                document.getElementById(id).classList.toggle('hidden', id !== view + 'View');
+            const legacyTab = document.querySelector(`.view-tab[data-view="${view}"]`);
+            if (legacyTab) legacyTab.classList.add('active');
+            ['dashboardView', 'tableView', 'kanbanView', 'timelineView', 'calendarView', 'notesView'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.toggle('hidden', id !== view + 'View');
             });
             // Fade-in animation for the active view
             const container = document.getElementById(view + 'View');
@@ -2778,22 +5126,99 @@
             if (view === 'dashboard') renderDashboard();
             else if (view === 'calendar') renderCalendar();
             else if (view === 'notes') renderNotes();
+            else if (view === 'timeline') renderTimeline();
             else renderApp();
         }
 
         function renderApp() {
             updateSummary();
-            const view = document.querySelector('.view-tab.active').dataset.view;
+            // Prism 'timeline' view has no legacy .view-tab; detect it via the visible view container
+            const activeTab = document.querySelector('.view-tab.active');
+            let view = activeTab ? activeTab.dataset.view : null;
+            if (!view) {
+                const visible = ['dashboard','table','kanban','timeline','calendar','notes']
+                    .find(v => {
+                        const el = document.getElementById(v + 'View');
+                        return el && !el.classList.contains('hidden');
+                    });
+                view = visible || 'dashboard';
+            }
             if (view === 'dashboard') renderDashboard();
             else if (view === 'kanban') renderKanban();
+            else if (view === 'timeline') renderTimeline();
+            else if (view === 'calendar') renderCalendar();
+            else if (view === 'notes') renderNotes();
             else renderTable();
+            // Prism: keep sidebar flows list in sync with data
+            if (typeof renderPrismSidebar === 'function') renderPrismSidebar();
         }
 
         function renderTable() {
             const container = document.getElementById('tableView');
             container.innerHTML = '';
 
-            appData.groups.forEach(group => {
+            // Filter breadcrumb (Prism only): if selectedFlowId is set, show a dismissible chip
+            const isPrism = document.body.classList.contains('prism-theme');
+            const activeGroup = selectedFlowId
+                ? appData.groups.find(g => g.id === selectedFlowId)
+                : null;
+
+            // Prism editorial masthead + KPI strip (Iter 7)
+            if (isPrism) {
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const allTasks = (appData.groups || []).flatMap(g => g.tasks || []);
+                const flowCount = (appData.groups || []).length;
+                const total = allTasks.length;
+                const working = allTasks.filter(t => t.status === 'Working on it').length;
+                const stuck = allTasks.filter(t => t.status === 'Stuck').length;
+                const overdue = allTasks.filter(t => t.dueDate && t.dueDate < todayStr && t.status !== 'Done').length;
+                const done = allTasks.filter(t => t.status === 'Done').length;
+                const pct = total > 0 ? Math.round(done / total * 100) : 0;
+                const mhWrap = document.createElement('div');
+                mhWrap.innerHTML = renderPrismViewMasthead({
+                    title: activeGroup ? 'The Flow Desk' : 'All Flows',
+                    tagline: activeGroup
+                        ? `Focused on ${activeGroup.title}`
+                        : `${flowCount} flow${flowCount === 1 ? '' : 's'} · ${total} task${total === 1 ? '' : 's'}`,
+                    kpis: [
+                        { label: 'Flows',    value: flowCount, icon: '◈', color: 'var(--pr-ink)' },
+                        { label: 'Tasks',    value: total,     icon: '∑', color: 'var(--pr-ink)' },
+                        { label: 'Working',  value: working,   icon: '⚡', color: 'var(--pr-accent)' },
+                        { label: 'Stuck',    value: stuck,     icon: '⚠', color: 'var(--pr-red)' },
+                        { label: 'Overdue',  value: overdue,   icon: '⏱', color: 'var(--pr-amber)' },
+                        { label: 'Progress', value: pct + '%', icon: '◐', color: 'var(--pr-green)' }
+                    ]
+                });
+                while (mhWrap.firstChild) container.appendChild(mhWrap.firstChild);
+            }
+
+            if (isPrism && activeGroup) {
+                const bc = document.createElement('div');
+                bc.className = 'prism-flow-breadcrumb';
+                bc.innerHTML = `
+                    <button type="button" class="pr-bc-clear" title="Show all flows">
+                        <span class="pr-bc-dot" style="background:${activeGroup.color || '#999'}"></span>
+                        <span class="pr-bc-label">Flows <span class="pr-bc-sep">›</span> <strong>${(activeGroup.title || '').replace(/</g,'&lt;')}</strong></span>
+                        <span class="pr-bc-x" aria-label="Clear filter">✕</span>
+                    </button>
+                    <span class="pr-bc-hint">showing 1 flow · click to show all</span>
+                `;
+                bc.querySelector('.pr-bc-clear').addEventListener('click', () => {
+                    selectedFlowId = null;
+                    renderTable();
+                    if (typeof renderPrismSidebar === 'function') renderPrismSidebar();
+                });
+                container.appendChild(bc);
+            } else if (isPrism && !activeGroup && selectedFlowId) {
+                // Stale id — clear it silently
+                selectedFlowId = null;
+            }
+
+            const visibleGroups = activeGroup
+                ? [activeGroup]
+                : appData.groups;
+
+            visibleGroups.forEach(group => {
                 const groupCard = document.createElement('div');
                 groupCard.className = 'group-card';
 
@@ -2966,7 +5391,9 @@
                 emptyState.style.color = '#999';
                 emptyState.innerHTML = '<p>No groups yet. <button class="btn btn-primary" onclick="createNewGroup()">Create Group</button></p>';
                 container.appendChild(emptyState);
-            } else {
+            } else if (!activeGroup) {
+                // Hide "Add Group" while a single flow is focused — creating a new flow
+                // from inside a filtered view is surprising UX
                 const addGroupBtn = document.createElement('button');
                 addGroupBtn.className = 'btn btn-primary';
                 addGroupBtn.textContent = '+ Add Group';
@@ -2977,13 +5404,15 @@
         }
 
         function createNewGroup() {
-            appData.groups.push({
+            const g = {
                 id: 'group_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
                 title: 'New Group',
                 color: GROUP_COLORS[appData.groups.length % GROUP_COLORS.length],
                 collapsed: false,
                 tasks: []
-            });
+            };
+            appData.groups.push(g);
+            logActivity('FLOW', `Created flow ${g.title}`);
             debouncedSync();
             renderTable();
         }
@@ -3018,7 +5447,9 @@
             checkbox.type = 'checkbox';
             checkbox.checked = task.status === 'Done';
             checkbox.addEventListener('change', () => {
-                task.status = checkbox.checked ? 'Done' : 'Not Started';
+                const next = checkbox.checked ? 'Done' : 'Not Started';
+                logActivity(next === 'Done' ? 'DONE' : 'MOVED', `${task.name} → ${next}`);
+                task.status = next;
                 debouncedSync();
                 renderApp();
             });
@@ -3220,12 +5651,205 @@
             return tr;
         }
 
+        // ── Timeline (Horizon 14-day Gantt ribbon) ──
+        // Renders a sticky-header ribbon of 14 days (today -3 through today +10) with
+        // one row per flow. Tasks with a dueDate within range appear as status-colored
+        // pills at their dueDate column. Overdue tasks get a red outline. Overlapping
+        // tasks in the same flow/day stack to a second tier.
+        function renderTimeline() {
+            const container = document.getElementById('timelineView');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const DAYS = 14, OFFSET_BEFORE = 3;
+            const today = new Date(); today.setHours(0,0,0,0);
+            const start = new Date(today); start.setDate(start.getDate() - OFFSET_BEFORE);
+            const days = [];
+            for (let i = 0; i < DAYS; i++) {
+                const d = new Date(start); d.setDate(start.getDate() + i);
+                days.push(d);
+            }
+            const isWeekend = (d) => d.getDay() === 0 || d.getDay() === 6;
+            const sameDay   = (a, b) => a.getTime() === b.getTime();
+            const dowShort  = (d) => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+            const parseDue  = (s) => {
+                if (!s) return null;
+                const p = String(s).substring(0, 10).split('-').map(Number);
+                if (p.length < 3 || p.some(isNaN)) return null;
+                return new Date(p[0], p[1]-1, p[2]);
+            };
+            const statusColor = (st) => {
+                const k = (st || '').toLowerCase();
+                if (k.includes('done'))   return 'var(--pr-green)';
+                if (k.includes('work'))   return 'var(--pr-accent)';
+                if (k.includes('stuck'))  return 'var(--pr-red)';
+                if (k.includes('review') || k.includes('wait')) return 'var(--pr-amber)';
+                if (k.includes('hold'))   return 'var(--pr-muted)';
+                return '#4A7FC9'; // fallback blueish
+            };
+
+            const esc = (s) => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const range0 = days[0].getTime();
+            const range1 = days[DAYS-1].getTime();
+
+            const shell = document.createElement('div');
+            shell.className = 'pr-timeline';
+
+            // ── Header
+            const header = document.createElement('div');
+            header.className = 'pr-timeline-header';
+            const headerDaysHtml = days.map(d => {
+                const cls = ['pr-timeline-day-head'];
+                if (isWeekend(d)) cls.push('weekend');
+                if (sameDay(d, today)) cls.push('today');
+                return `<div class="${cls.join(' ')}">
+                    <div class="pr-timeline-day-dow">${dowShort(d)}</div>
+                    <div class="pr-timeline-day-num">${d.getDate()}</div>
+                </div>`;
+            }).join('');
+            header.innerHTML = `
+                <div class="pr-timeline-header-corner">
+                    <div class="pr-timeline-title">Timeline</div>
+                    <div class="pr-timeline-sub">${DAYS} days · today ±${OFFSET_BEFORE}/${DAYS-OFFSET_BEFORE-1}</div>
+                </div>
+                <div class="pr-timeline-header-days">${headerDaysHtml}</div>
+            `;
+            shell.appendChild(header);
+
+            // ── Rows
+            const rowsWrap = document.createElement('div');
+            rowsWrap.className = 'pr-timeline-rows';
+            const groups = (appData && appData.groups) ? appData.groups : [];
+            if (groups.length === 0) {
+                rowsWrap.innerHTML = `<div class="pr-timeline-empty">No flows yet. Add a flow to see tasks on the timeline.</div>`;
+            } else {
+                groups.forEach(group => {
+                    const row = document.createElement('div');
+                    row.className = 'pr-timeline-row';
+
+                    const label = document.createElement('div');
+                    label.className = 'pr-timeline-row-label';
+                    const groupCount = (group.tasks || []).length;
+                    label.innerHTML = `
+                        <span class="pr-timeline-dot" style="background:${esc(group.color || '#999')}"></span>
+                        <span class="pr-timeline-row-name">${esc(group.title || 'Untitled')}</span>
+                        <span class="pr-timeline-row-count">${groupCount}</span>
+                    `;
+                    row.appendChild(label);
+
+                    const track = document.createElement('div');
+                    track.className = 'pr-timeline-row-track';
+                    // 14 background cells
+                    days.forEach(d => {
+                        const cell = document.createElement('div');
+                        cell.className = 'pr-timeline-cell-bg';
+                        if (isWeekend(d)) cell.classList.add('weekend');
+                        if (sameDay(d, today)) cell.classList.add('today');
+                        track.appendChild(cell);
+                    });
+
+                    // Collect in-range tasks; track collisions per column for stacking
+                    const used = new Array(DAYS).fill(0); // 0=empty, 1=first tier taken
+                    let anyStacked = false;
+                    (group.tasks || []).forEach(task => {
+                        const due = parseDue(task.dueDate);
+                        if (!due) return;
+                        const t = due.getTime();
+                        if (t < range0 || t > range1) return;
+                        const dayIdx = Math.round((t - range0) / 86400000);
+                        if (dayIdx < 0 || dayIdx >= DAYS) return;
+                        const stacked = used[dayIdx] >= 1 ? 1 : 0;
+                        if (stacked) anyStacked = true;
+                        used[dayIdx]++;
+
+                        const bar = document.createElement('div');
+                        bar.className = 'pr-timeline-bar';
+                        if (stacked) bar.dataset.stacked = '1';
+                        const overdueTask = (typeof isOverdue === 'function') && isOverdue(task.dueDate, task.status);
+                        if (overdueTask) bar.classList.add('overdue');
+                        bar.style.setProperty('--bar-idx', dayIdx);
+                        bar.style.backgroundColor = statusColor(task.status);
+                        const taskLabel = task.name || task.title || 'Untitled';
+                        bar.title = `${taskLabel} · ${task.status || 'Not Started'} · due ${task.dueDate}${overdueTask ? ' · OVERDUE' : ''}`;
+                        bar.innerHTML = `<span class="pr-timeline-bar-title">${esc(taskLabel)}</span>`;
+                        bar.addEventListener('click', () => {
+                            switchView('table');
+                            if (typeof syncPrismNavActive === 'function') syncPrismNavActive('table');
+                            setTimeout(() => {
+                                const card = document.querySelector(`.group-card[data-gid="${group.id}"], .group-card[id="group-${group.id}"]`);
+                                if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }, 60);
+                        });
+                        track.appendChild(bar);
+                    });
+                    if (anyStacked) row.dataset.stacked = '1';
+
+                    row.appendChild(track);
+                    rowsWrap.appendChild(row);
+                });
+            }
+            shell.appendChild(rowsWrap);
+
+            // Legend
+            const legend = document.createElement('div');
+            legend.className = 'pr-timeline-legend';
+            legend.innerHTML = `
+                <span><span class="pr-legend-chip" style="background:var(--pr-accent)"></span>Working</span>
+                <span><span class="pr-legend-chip" style="background:var(--pr-amber)"></span>Waiting / Review</span>
+                <span><span class="pr-legend-chip" style="background:var(--pr-red)"></span>Stuck</span>
+                <span><span class="pr-legend-chip" style="background:var(--pr-green)"></span>Done</span>
+                <span><span class="pr-legend-chip" style="background:var(--pr-muted)"></span>On hold</span>
+                <span style="margin-left:auto;color:var(--pr-muted);">Click a bar → Flows view</span>
+            `;
+            shell.appendChild(legend);
+
+            container.appendChild(shell);
+        }
+
         function renderKanban() {
             const container = document.getElementById('kanbanView');
             container.innerHTML = '';
 
             const statuses = ['Not Started', 'Working on it', 'Waiting for review', 'On Hold', 'Stuck', 'Done'];
             const allTasks = appData.groups.flatMap(g => g.tasks.map(t => ({ ...t, groupId: g.id })));
+
+            // Prism editorial masthead + KPI strip (Iter 7)
+            // Kanban container is display:flex row, so the masthead+kpis must be
+            // full-width blocks ABOVE the columns. We wrap the columns in their
+            // own flex row inside the container.
+            const isPrism = document.body.classList.contains('prism-theme');
+            let columnsHost = container;
+            if (isPrism) {
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const working = allTasks.filter(t => t.status === 'Working on it').length;
+                const stuck = allTasks.filter(t => t.status === 'Stuck').length;
+                const done = allTasks.filter(t => t.status === 'Done').length;
+                const overdue = allTasks.filter(t => t.dueDate && t.dueDate < todayStr && t.status !== 'Done').length;
+                const total = allTasks.length;
+                const pct = total > 0 ? Math.round(done / total * 100) : 0;
+                const mhWrap = document.createElement('div');
+                mhWrap.style.width = '100%';
+                mhWrap.innerHTML = renderPrismViewMasthead({
+                    title: 'Board',
+                    tagline: `${total} card${total === 1 ? '' : 's'} across ${statuses.length} columns`,
+                    kpis: [
+                        { label: 'Total',    value: total,     icon: '∑', color: 'var(--pr-ink)' },
+                        { label: 'Working',  value: working,   icon: '⚡', color: 'var(--pr-accent)' },
+                        { label: 'Stuck',    value: stuck,     icon: '⚠', color: 'var(--pr-red)' },
+                        { label: 'Overdue',  value: overdue,   icon: '⏱', color: 'var(--pr-amber)' },
+                        { label: 'Done',     value: done,      icon: '✓', color: 'var(--pr-green)' },
+                        { label: 'Progress', value: pct + '%', icon: '◐', color: 'var(--pr-green)' }
+                    ]
+                });
+                while (mhWrap.firstChild) container.appendChild(mhWrap.firstChild);
+                columnsHost = document.createElement('div');
+                columnsHost.className = 'prism-kanban-columns';
+                columnsHost.style.display = 'flex';
+                columnsHost.style.gap = '16px';
+                columnsHost.style.overflowX = 'auto';
+                columnsHost.style.paddingBottom = '8px';
+                container.appendChild(columnsHost);
+            }
 
             statuses.forEach(status => {
                 const column = document.createElement('div');
@@ -3292,13 +5916,14 @@
                     const fromStatus = e.dataTransfer.getData('fromStatus');
                     const task = allTasks.find(t => t.id === taskId);
                     if (task && fromStatus !== status) {
+                        logActivity(status === 'Done' ? 'DONE' : (status === 'Stuck' ? 'STUCK' : 'MOVED'), `${task.name} → ${status}`);
                         task.status = status;
                         debouncedSync();
                         renderKanban();
                     }
                 });
 
-                container.appendChild(column);
+                columnsHost.appendChild(column);
             });
         }
 
@@ -3370,6 +5995,7 @@
                 opt.style.color = 'white';
                 opt.textContent = status;
                 opt.addEventListener('click', () => {
+                    logActivity(status === 'Done' ? 'DONE' : (status === 'Stuck' ? 'STUCK' : 'MOVED'), `${task.name} → ${status}`);
                     task.status = status;
                     debouncedSync();
                     closeStatusPickerPopup();
@@ -3586,7 +6212,31 @@
                 eventsByDate[d].push(ev);
             });
 
-            let html = `<div class="calendar-nav">
+            // Prism editorial masthead + KPI strip (Iter 7)
+            let html = '';
+            const isPrism = document.body.classList.contains('prism-theme');
+            if (isPrism) {
+                const todayStr = today.toISOString().slice(0, 10);
+                const eventsThisMonth = (calendarData.events || []).filter(ev => {
+                    const d = (ev.event_date || '').slice(0, 7);
+                    return d === `${year}-${String(month+1).padStart(2,'0')}`;
+                }).length;
+                const eventsToday = (eventsByDate[todayStr] || []).length;
+                const tasksToday = (tasksByDate[todayStr] || []).length;
+                const upcoming = Object.keys(eventsByDate).filter(d => d >= todayStr).length;
+                html += renderPrismViewMasthead({
+                    title: 'Calendar',
+                    tagline: `${monthNames[month]} ${year} · ${calendarMode} view`,
+                    kpis: [
+                        { label: 'Today',      value: eventsToday, icon: '●', color: 'var(--pr-accent)', hint: `${tasksToday} task${tasksToday===1?'':'s'} due` },
+                        { label: 'This month', value: eventsThisMonth, icon: '◆', color: 'var(--pr-ink)' },
+                        { label: 'Upcoming',   value: upcoming, icon: '→', color: 'var(--pr-green)' },
+                        { label: 'Days',       value: daysInMonth, icon: '∎', color: 'var(--pr-amber)' }
+                    ]
+                });
+            }
+
+            html += `<div class="calendar-nav">
                 <button onclick="calendarDate.setMonth(calendarDate.getMonth()-1); renderCalendar();">&larr;</button>
                 <button onclick="calendarDate = new Date(); renderCalendar();">Today</button>
                 <button onclick="calendarDate.setMonth(calendarDate.getMonth()+1); renderCalendar();">&rarr;</button>
@@ -3663,7 +6313,33 @@
                 eventsByDate[d].push(ev);
             });
 
-            let html = `<div class="calendar-nav">
+            // Prism editorial masthead (Iter 7) — week view
+            let html = '';
+            const isPrismWeek = document.body.classList.contains('prism-theme');
+            if (isPrismWeek) {
+                const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
+                const inWeek = (dateStr) => {
+                    const d = new Date(dateStr);
+                    return d >= weekStart && d <= weekEnd;
+                };
+                let weekEvents = 0, weekTasks = 0, weekTodayEvents = 0;
+                const todayStr = today.toISOString().slice(0, 10);
+                Object.keys(eventsByDate).forEach(d => { if (inWeek(d)) weekEvents += eventsByDate[d].length; });
+                Object.keys(tasksByDate).forEach(d => { if (inWeek(d)) weekTasks += tasksByDate[d].length; });
+                weekTodayEvents = (eventsByDate[todayStr] || []).length;
+                html += renderPrismViewMasthead({
+                    title: 'Calendar',
+                    tagline: `Week of ${monthNames[weekStart.getMonth()]} ${weekStart.getDate()} · week view`,
+                    kpis: [
+                        { label: 'Today',   value: weekTodayEvents, icon: '●', color: 'var(--pr-accent)' },
+                        { label: 'Events',  value: weekEvents,      icon: '◆', color: 'var(--pr-ink)' },
+                        { label: 'Tasks',   value: weekTasks,       icon: '∑', color: 'var(--pr-amber)' },
+                        { label: 'Span',    value: '7 days',        icon: '∎', color: 'var(--pr-green)' }
+                    ]
+                });
+            }
+
+            html += `<div class="calendar-nav">
                 <button onclick="calendarDate.setDate(calendarDate.getDate()-7); renderCalendar();">&larr;</button>
                 <button onclick="calendarDate = new Date(); renderCalendar();">Today</button>
                 <button onclick="calendarDate.setDate(calendarDate.getDate()+7); renderCalendar();">&rarr;</button>
@@ -3724,7 +6400,23 @@
                 });
             });
 
-            let html = `<div class="calendar-nav">
+            // Prism editorial masthead (Iter 7) — day view
+            let html = '';
+            const isPrismDay = document.body.classList.contains('prism-theme');
+            if (isPrismDay) {
+                const weekdayLabel = new Date(year, month, date).toLocaleDateString('en-US', { weekday: 'long' });
+                html += renderPrismViewMasthead({
+                    title: 'Calendar',
+                    tagline: `${weekdayLabel}, ${monthNames[month]} ${date} · day view`,
+                    kpis: [
+                        { label: 'Events',    value: dayEvents.length, icon: '◆', color: 'var(--pr-accent)' },
+                        { label: 'Tasks due', value: dayTasks.length,  icon: '∑', color: 'var(--pr-amber)' },
+                        { label: 'All day',   value: dayEvents.filter(ev => ev.all_day).length, icon: '●', color: 'var(--pr-green)' }
+                    ]
+                });
+            }
+
+            html += `<div class="calendar-nav">
                 <button onclick="calendarDate.setDate(calendarDate.getDate()-1); renderCalendar();">&larr;</button>
                 <button onclick="calendarDate = new Date(); renderCalendar();">Today</button>
                 <button onclick="calendarDate.setDate(calendarDate.getDate()+1); renderCalendar();">&rarr;</button>
@@ -3987,6 +6679,543 @@
         // ── Dashboard ──
         function renderDashboard() {
             const container = document.getElementById('dashboardView');
+            const isPrism = document.body.classList.contains('prism-theme');
+            if (isPrism) { renderPrismDashboard(container); return; }
+            // (Legacy dashboard rendering below — kept for non-Prism themes)
+            renderLegacyDashboard(container);
+        }
+
+        // ── Prism Bento dashboard ──
+        function renderPrismDashboard(container) {
+            const groups = (appData && appData.groups) ? appData.groups : [];
+            const allTasks = groups.flatMap(g => (g.tasks || []).map(t => ({...t, groupName: g.title, groupColor: g.color, groupId: g.id})));
+            const total = allTasks.length;
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const done = allTasks.filter(t => t.status === 'Done').length;
+            const working = allTasks.filter(t => t.status === 'Working on it').length;
+            const stuck = allTasks.filter(t => t.status === 'Stuck').length;
+            const overdue = allTasks.filter(t => t.dueDate && t.dueDate < todayStr && t.status !== 'Done').length;
+            const pct = total > 0 ? Math.round(done / total * 100) : 0;
+
+            // Greeting
+            const hour = new Date().getHours();
+            const greet = hour < 5 ? 'Working late' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+            const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            const todayEvents = (calendarData.events || []).filter(ev => {
+                const d = (ev.date || ev.start || '').slice(0, 10);
+                return d === todayStr;
+            });
+            const todayTasks = allTasks.filter(t => t.dueDate === todayStr && t.status !== 'Done');
+
+            const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+            // Atlas masthead — editorial nameplate (shows in all skins, looks best in Atlas)
+            const mastheadDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            const issueNum = dayOfYear(new Date());
+            const mastheadTagline = atlasTaglines[issueNum % atlasTaglines.length];
+            let html = '';
+            html += `<div class="prism-masthead">
+                <div class="prism-masthead-issue">Vol. II · Issue No. ${String(issueNum).padStart(3,'0')}</div>
+                <div class="prism-masthead-title">The Flowdesk Daily</div>
+                <div class="prism-masthead-date">${mastheadDate} · ${esc(mastheadTagline)}</div>
+            </div>`;
+
+            html += `
+                <div class="prism-hero">
+                    <div>
+                        <h1>${greet}, Kevin</h1>
+                        <div class="prism-hero-sub">${todayLabel} · ${todayEvents.length} event${todayEvents.length===1?'':'s'} · ${todayTasks.length} task${todayTasks.length===1?'':'s'} due today</div>
+                    </div>
+                    <div class="prism-hero-actions">
+                        <button class="prism-btn prism-btn-ghost" onclick="document.getElementById('prismFullSyncBtn')?.click()">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+                            Refresh
+                        </button>
+                        <button class="prism-btn prism-btn-ghost" onclick="enterFocusMode()" title="Enter Focus mode (⌘⇧F)">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
+                            Focus
+                        </button>
+                        <button class="prism-btn prism-btn-primary" onclick="document.getElementById('prismNewTaskBtn')?.click()">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                            New task
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // 6-KPI row (Mission-style operator dashboard)
+            const notStarted = allTasks.filter(t => t.status === 'Not Started' || !t.status).length;
+            const kpis = [
+                { label: 'Total',    value: total,        hint: `${appData.groups.length} flow${appData.groups.length===1?'':'s'}`, color: 'var(--pr-ink)',       icon: '∑' },
+                { label: 'Working',  value: working,      hint: 'in flight',               color: 'var(--pr-accent)',    icon: '⚡' },
+                { label: 'Stuck',    value: stuck,        hint: 'blocked',                 color: 'var(--pr-red)',       icon: '⚠' },
+                { label: 'Overdue',  value: overdue,      hint: 'past due',                color: 'var(--pr-amber)',     icon: '⏱' },
+                { label: 'Done',     value: done,         hint: `of ${total} total`,       color: 'var(--pr-green)',     icon: '✓' },
+                { label: 'Progress', value: pct + '%',    hint: 'across all flows',        color: 'var(--pr-accent-2, var(--pr-accent))', icon: '◐' },
+            ];
+            html += '<div class="prism-bento-kpis">';
+            kpis.forEach(k => {
+                html += `<div class="prism-tile prism-kpi">
+                    <div class="prism-kpi-head">
+                        <div class="prism-kpi-icon" style="background: color-mix(in oklab, ${k.color} 18%, transparent); color: ${k.color};">${k.icon}</div>
+                        <span class="prism-kpi-label">${k.label}</span>
+                    </div>
+                    <div class="prism-kpi-value">${k.value}</div>
+                    <div class="prism-kpi-hint">${k.hint}</div>
+                </div>`;
+            });
+            html += '</div>';
+
+            // Bento body
+            html += '<div class="prism-bento">';
+
+            // On deck today (span 2)
+            const onDeck = allTasks
+                .filter(t => t.status !== 'Done')
+                .sort((a, b) => {
+                    const ad = a.dueDate || '9999-12-31';
+                    const bd = b.dueDate || '9999-12-31';
+                    return ad.localeCompare(bd);
+                })
+                .slice(0, 5);
+            html += `<div class="prism-tile span-2">
+                <div class="prism-tile-head">
+                    <div class="prism-tile-title">On deck today</div>
+                    <button class="prism-tile-link" onclick="switchView('table'); syncPrismNavActive('table');">See all →</button>
+                </div>
+                <div>`;
+            if (onDeck.length === 0) {
+                html += `<div class="prism-empty">All caught up. Add a task to get going.</div>`;
+            } else {
+                onDeck.forEach(t => {
+                    const isDone = t.status === 'Done';
+                    const due = t.dueDate ? prismRelativeDay(t.dueDate) : '—';
+                    const prioHtml = prismPrioHtml(t.priority);
+                    html += `<div class="prism-task-row" onclick="switchView('table'); syncPrismNavActive('table');">
+                        <div class="prism-task-bar" style="background:${t.groupColor || '#999'}"></div>
+                        <div class="prism-task-check ${isDone ? 'done' : ''}"></div>
+                        <div class="prism-task-body">
+                            <div class="prism-task-title ${isDone ? 'done' : ''}">${esc(t.name)}</div>
+                            <div class="prism-task-meta">
+                                <span>${esc(t.groupName || '')}</span>
+                                <span>·</span>
+                                <span>${due}</span>
+                            </div>
+                        </div>
+                        ${prioHtml}
+                    </div>`;
+                });
+            }
+            html += `</div></div>`;
+
+            // Today's calendar (span 2)
+            html += `<div class="prism-tile span-2">
+                <div class="prism-tile-head">
+                    <div class="prism-tile-title">Today's calendar</div>
+                    <div class="prism-tile-meta">${todayEvents.length} event${todayEvents.length===1?'':'s'}</div>
+                </div>
+                <div class="prism-schedule">`;
+            if (todayEvents.length === 0) {
+                html += `<div class="prism-schedule-empty">No events scheduled</div>`;
+            } else {
+                // Hour labels 9-17 (5 marks)
+                const hours = [9, 11, 13, 15, 17];
+                hours.forEach((h, i) => {
+                    const top = 12 + i * 56;
+                    html += `<div class="prism-schedule-hour" style="top:${top}px;">${h}:00</div>`;
+                    html += `<div class="prism-schedule-line" style="top:${top + 6}px;"></div>`;
+                });
+                todayEvents.forEach(ev => {
+                    // Parse start/end (events have .startTime "HH:MM" + .date "YYYY-MM-DD" OR .start ISO)
+                    let startH, endH;
+                    if (ev.startTime) {
+                        const [sh, sm] = ev.startTime.split(':').map(Number);
+                        startH = sh + (sm || 0) / 60;
+                    } else if (ev.start) {
+                        const sd = new Date(ev.start);
+                        startH = sd.getHours() + sd.getMinutes() / 60;
+                    } else {
+                        startH = 9;
+                    }
+                    if (ev.endTime) {
+                        const [eh, em] = ev.endTime.split(':').map(Number);
+                        endH = eh + (em || 0) / 60;
+                    } else if (ev.end) {
+                        const ed = new Date(ev.end);
+                        endH = ed.getHours() + ed.getMinutes() / 60;
+                    } else {
+                        endH = startH + 1;
+                    }
+                    const top = (startH - 9) * 28 + 12;
+                    const h = Math.max(22, (endH - startH) * 28);
+                    const color = ev.color || '#4A5CC9';
+                    const startTimeStr = ev.startTime || (ev.start ? new Date(ev.start).toTimeString().slice(0,5) : '');
+                    const endTimeStr = ev.endTime || (ev.end ? new Date(ev.end).toTimeString().slice(0,5) : '');
+                    const kind = eventKindGlyph(ev);
+                    html += `<div class="prism-schedule-event" style="top:${top}px;height:${h}px;background:color-mix(in oklab, ${color} 22%, var(--pr-surface));border-left:3px solid ${color};">
+                        <div class="prism-schedule-event-title"><span class="pr-glyph ${kind.kind}" style="color:${color};">${kind.glyph}</span>${esc(ev.title || ev.name || 'Untitled')}</div>
+                        <div class="prism-schedule-event-time">${startTimeStr}${endTimeStr ? '–' + endTimeStr : ''}</div>
+                    </div>`;
+                });
+            }
+            html += `</div></div>`;
+
+            // Flows progress (span 2)
+            html += `<div class="prism-tile span-2">
+                <div class="prism-tile-head">
+                    <div class="prism-tile-title">Flows</div>
+                    <button class="prism-tile-link" onclick="switchView('table'); syncPrismNavActive('table');">Open →</button>
+                </div>
+                <div>`;
+            if (groups.length === 0) {
+                html += `<div class="prism-empty">No flows yet</div>`;
+            } else {
+                groups.slice(0, 6).forEach(g => {
+                    const ts = g.tasks || [];
+                    const gDone = ts.filter(t => t.status === 'Done').length;
+                    const gPct = ts.length > 0 ? Math.round(gDone / ts.length * 100) : 0;
+                    const gStuck = ts.filter(t => t.status === 'Stuck' || (t.dueDate && t.dueDate < todayStr && t.status !== 'Done')).length;
+                    html += `<div class="prism-flow-prog">
+                        <div class="prism-flow-prog-head">
+                            <span class="prism-flow-prog-dot" style="background:${g.color || '#999'}"></span>
+                            <span class="prism-flow-prog-name">${esc(g.title)}</span>
+                            <span class="prism-flow-prog-stat">${gDone}/${ts.length}</span>
+                            ${gStuck > 0 ? `<span class="prism-flow-prog-warn">⚠ ${gStuck}</span>` : ''}
+                        </div>
+                        <div class="prism-flow-prog-bar"><div class="prism-flow-prog-fill" style="width:${gPct}%;background:${g.color || '#999'};"></div></div>
+                    </div>`;
+                });
+            }
+            html += `</div></div>`;
+
+            // Recent notes (span 2)
+            const recentNotes = (notesData.notes || [])
+                .slice()
+                .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
+                .slice(0, 4);
+            html += `<div class="prism-tile span-2">
+                <div class="prism-tile-head">
+                    <div class="prism-tile-title">Recent notes</div>
+                    <button class="prism-tile-link" onclick="switchView('notes'); syncPrismNavActive('notes');">Open library →</button>
+                </div>
+                <div class="prism-notes-grid">`;
+            if (recentNotes.length === 0) {
+                html += `<div class="prism-empty" style="grid-column:span 2;">No notes yet</div>`;
+            } else {
+                recentNotes.forEach(n => {
+                    const folder = n.folder || 'Unfiled';
+                    const previewText = (typeof noteStripHtml === 'function' ? noteStripHtml(n.content || '') : (n.content || '')).slice(0, 90);
+                    const time = (typeof noteRelativeDate === 'function' ? noteRelativeDate(n.updatedAt) : '') || '';
+                    const color = n.color || '#4A5CC9';
+                    html += `<div class="prism-note-card" onclick="switchView('notes'); syncPrismNavActive('notes'); if(typeof selectNote==='function'){setTimeout(()=>selectNote(${JSON.stringify(n.id)}), 30);}">
+                        <div class="prism-note-card-tag">
+                            <span class="prism-note-card-tag-dot" style="background:${color};"></span>
+                            <span class="prism-note-card-tag-name">${esc(folder)}</span>
+                        </div>
+                        <div class="prism-note-card-title">${esc(n.title || 'Untitled')}</div>
+                        <div class="prism-note-card-preview">${esc(previewText)}${previewText.length >= 90 ? '…' : ''}</div>
+                        <div class="prism-note-card-time">${time}</div>
+                    </div>`;
+                });
+            }
+            html += `</div></div>`;
+
+            // Atlas quote of the day (span 2) — Atlas editorial variant
+            const quote = atlasQuoteOfDay();
+            html += `<div class="prism-tile prism-quote span-2">
+                <div class="prism-quote-mark">"</div>
+                <div class="prism-quote-text">${esc(quote.text)}</div>
+                <div class="prism-quote-author">${esc(quote.author)}</div>
+            </div>`;
+
+            // Today's agenda (span 2) — Atlas editorial numbered list
+            //   Today-due + Working-on-it, capped at 8, numbered
+            const agendaItems = allTasks
+                .filter(t => t.status !== 'Done' && (t.dueDate === todayStr || t.status === 'Working on it'))
+                .sort((a, b) => {
+                    // Working-on-it items first, then by priority, then by name
+                    const wa = a.status === 'Working on it' ? 0 : 1;
+                    const wb = b.status === 'Working on it' ? 0 : 1;
+                    if (wa !== wb) return wa - wb;
+                    const prioRank = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+                    const pa = prioRank[a.priority] ?? 4;
+                    const pb = prioRank[b.priority] ?? 4;
+                    if (pa !== pb) return pa - pb;
+                    return (a.name || '').localeCompare(b.name || '');
+                })
+                .slice(0, 8);
+            html += `<div class="prism-tile span-2">
+                <div class="prism-tile-head">
+                    <div class="prism-tile-title">Today's agenda</div>
+                    <div class="prism-tile-meta">${agendaItems.length} item${agendaItems.length===1?'':'s'} · in order</div>
+                </div>
+                <div>`;
+            if (agendaItems.length === 0) {
+                html += `<div class="prism-empty">Nothing on deck for today — enjoy the quiet.</div>`;
+            } else {
+                agendaItems.forEach((t, i) => {
+                    const isDone = t.status === 'Done';
+                    const num = String(i + 1).padStart(2, '0') + '.';
+                    const prioHtml = prismPrioHtml(t.priority);
+                    const metaBits = [];
+                    if (t.status && t.status !== 'Not Started') metaBits.push(esc(t.status));
+                    if (t.groupName) metaBits.push(esc(t.groupName));
+                    html += `<div class="prism-agenda-row">
+                        <span class="prism-agenda-num">${num}</span>
+                        <span class="prism-agenda-title ${isDone ? 'done' : ''}">${esc(t.name)}</span>
+                        <span class="prism-agenda-meta">${prioHtml}${metaBits.length ? '<span style="margin-left:8px;">' + metaBits.join(' · ') + '</span>' : ''}</span>
+                    </div>`;
+                });
+            }
+            html += `</div></div>`;
+
+            // Activity log tile (span 2) — Mission variant
+            html += `<div class="prism-tile span-2">
+                <div class="prism-tile-head">
+                    <div class="prism-tile-title">Activity log</div>
+                    <div class="prism-tile-meta">last ${Math.min(ACTIVITY_MAX, activityLog.length)} · newest first</div>
+                </div>
+                <div id="prismActivityLogBody" class="prism-activity">${renderActivityLogHtml()}</div>
+            </div>`;
+
+            // Hotkey legend tile (span 2) — Mission variant
+            html += `<div class="prism-tile span-2">
+                <div class="prism-tile-head">
+                    <div class="prism-tile-title">Shortcuts</div>
+                    <div class="prism-tile-meta">press <span style="font-family:var(--pr-mono);background:var(--pr-surface-2);padding:1px 5px;border-radius:4px;">g</span> then a letter</div>
+                </div>
+                <div class="prism-hotkeys">
+                    <div class="prism-hotkey-group-title">Global</div>
+                    ${hotkeyRow('Search', ['⌘','K'])}
+                    ${hotkeyRow('New task', ['⌘','N'])}
+                    ${hotkeyRow('Quick sync', ['⌘','/'])}
+                    ${hotkeyRow('Change skin', ['⌘','⇧','T'])}
+                    ${hotkeyRow('Focus mode', ['⌘','⇧','F'])}
+                    <div class="prism-hotkey-group-title">Navigate (g then…)</div>
+                    ${hotkeyRow('Home', ['g','h'])}
+                    ${hotkeyRow('Flows', ['g','f'])}
+                    ${hotkeyRow('Board', ['g','b'])}
+                    ${hotkeyRow('Timeline', ['g','t'])}
+                    ${hotkeyRow('Calendar', ['g','c'])}
+                    ${hotkeyRow('Notes', ['g','n'])}
+                </div>
+            </div>`;
+
+            // Quick capture gradient tile (span 2)
+            html += `<div class="prism-tile prism-capture span-2" onclick="document.getElementById('prismNewTaskBtn')?.click()">
+                <div class="prism-capture-inner">
+                    <div class="prism-capture-text">
+                        <div class="prism-capture-eyebrow">Quick capture</div>
+                        <div class="prism-capture-title">Drop a thought.<br>Sort it later.</div>
+                        <div class="prism-capture-hint">Click anywhere on this tile to add a task.</div>
+                    </div>
+                    <div class="prism-capture-icon">✦</div>
+                </div>
+            </div>`;
+
+            // Week ahead heatmap (span 4)
+            html += `<div class="prism-tile span-4">
+                <div class="prism-tile-head">
+                    <div class="prism-tile-title">Week ahead</div>
+                    <div class="prism-tile-meta">7-day load (events + tasks due)</div>
+                </div>
+                <div class="prism-week">`;
+            const todayD = new Date();
+            const weekStart = new Date(todayD);
+            const dayOfWeek = todayD.getDay();
+            weekStart.setDate(todayD.getDate() - ((dayOfWeek + 6) % 7));  // Monday
+            const dayShort = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(weekStart);
+                d.setDate(weekStart.getDate() + i);
+                const dStr = d.toISOString().slice(0, 10);
+                const evs = (calendarData.events || []).filter(ev => (ev.date || (ev.start || '').slice(0, 10)) === dStr);
+                const tdue = allTasks.filter(t => t.dueDate === dStr).length;
+                const load = evs.length + tdue;
+                const heat = Math.min(1, load / 4);
+                const isToday = dStr === todayStr;
+                const isWeekend = (i === 5 || i === 6);     // Sat, Sun
+                const isPast = dStr < todayStr;
+                const cls = ['prism-week-day'];
+                if (isToday) cls.push('today');
+                if (isWeekend) cls.push('weekend');
+                if (isPast) cls.push('past');
+                html += `<div class="${cls.join(' ')}">
+                    <div class="prism-week-day-label">${dayShort[i]}</div>
+                    <div class="prism-week-day-num">${d.getDate()}</div>
+                    <div class="prism-week-day-bar"><div class="prism-week-day-fill" style="width:${heat * 100}%;"></div></div>
+                    <div class="prism-week-day-count">${evs.length} ev · ${tdue} due</div>
+                </div>`;
+            }
+            html += `</div></div>`;
+
+            html += '</div>';  // end bento body
+
+            container.innerHTML = html;
+        }
+
+        // ── Atlas editorial helpers (Iter 5) ──
+        function dayOfYear(d) {
+            const start = new Date(d.getFullYear(), 0, 0);
+            const diff = d - start;
+            return Math.floor(diff / 86400000);
+        }
+
+        // Shared editorial masthead + KPI strip used by each Prism view
+        // (Tasks, Kanban, Calendar, Notes). Dashboard has its own bespoke
+        // masthead. Returns HTML string; caller prepends to view container.
+        // opts: { title, tagline?, kpis?: [{label, value, color?, icon?, hint?}] }
+        function renderPrismViewMasthead(opts) {
+            opts = opts || {};
+            const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const issueNum = dayOfYear(new Date());
+            const dateStr = new Date().toLocaleDateString('en-US', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+            let html = `<div class="prism-masthead">
+                <div class="prism-masthead-issue">Vol. II · Issue No. ${String(issueNum).padStart(3,'0')}</div>
+                <div class="prism-masthead-title">${esc(opts.title || '')}</div>
+                <div class="prism-masthead-date">${esc(dateStr)}${opts.tagline ? ' · ' + esc(opts.tagline) : ''}</div>
+            </div>`;
+            if (Array.isArray(opts.kpis) && opts.kpis.length) {
+                html += '<div class="prism-view-kpis">';
+                opts.kpis.forEach(k => {
+                    const color = k.color || 'var(--pr-accent)';
+                    html += `<div class="prism-view-kpi">
+                        <div class="prism-view-kpi-icon" style="background: color-mix(in oklab, ${color} 18%, transparent); color: ${color};">${esc(k.icon || '◉')}</div>
+                        <div class="prism-view-kpi-body">
+                            <span class="prism-view-kpi-label">${esc(k.label || '')}</span>
+                            <span class="prism-view-kpi-value">${esc(String(k.value == null ? '' : k.value))}</span>
+                            ${k.hint ? `<span class="prism-view-kpi-hint">${esc(k.hint)}</span>` : ''}
+                        </div>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+            return html;
+        }
+        const atlasTaglines = [
+            'Of ledgers, letters, and light.',
+            'All the work that\'s fit to ship.',
+            'Process, published daily.',
+            'The unhurried edition.',
+            'Bound by craft, carried by calendar.',
+            'A folio of open loops.',
+            'Type, time, and tasks in good order.',
+        ];
+        const atlasQuotes = [
+            { text: 'Small, steady strokes.', author: 'Folk wisdom' },
+            { text: 'The best way out is always through.', author: 'Robert Frost' },
+            { text: 'Discipline equals freedom.', author: 'Jocko Willink' },
+            { text: 'Do what you can, with what you have, where you are.', author: 'Theodore Roosevelt' },
+            { text: 'Make it work, make it right, make it fast.', author: 'Kent Beck' },
+            { text: 'Simplicity is the ultimate sophistication.', author: 'Leonardo da Vinci' },
+            { text: 'Well done is better than well said.', author: 'Benjamin Franklin' },
+            { text: 'The obstacle is the way.', author: 'Marcus Aurelius' },
+            { text: 'Done is better than perfect.', author: 'Sheryl Sandberg' },
+            { text: 'Beware the barrenness of a busy life.', author: 'Socrates' },
+            { text: 'Slow is smooth, smooth is fast.', author: 'Military adage' },
+        ];
+        function atlasQuoteOfDay() {
+            const idx = dayOfYear(new Date()) % atlasQuotes.length;
+            return atlasQuotes[idx];
+        }
+        // P0/P1/P2 priority token — Mission operator style
+        // Critical/Urgent → P0, High → P1, Medium → P2, Low → P3
+        function prismPrioToken(priority) {
+            const p = (priority || '').toLowerCase().trim();
+            if (!p || p === 'none' || p === '—') return null;
+            if (p === 'critical' || p === 'urgent' || p === 'p0') return { level: 'p0', label: 'P0' };
+            if (p === 'high'     || p === 'p1')                   return { level: 'p1', label: 'P1' };
+            if (p === 'medium'   || p === 'med' || p === 'p2')    return { level: 'p2', label: 'P2' };
+            if (p === 'low'      || p === 'p3')                   return { level: 'p3', label: 'P3' };
+            return { level: 'p2', label: 'P2' };
+        }
+        function prismPrioHtml(priority) {
+            const t = prismPrioToken(priority);
+            if (!t) return '';
+            return `<span class="prism-prio ${t.level}" title="${priority || ''} priority">${t.label}</span>`;
+        }
+
+        function eventKindGlyph(ev) {
+            const title = ((ev && (ev.title || ev.name)) || '').toLowerCase();
+            if (/\b(focus|deep\s*work|writing|heads[-\s]?down)\b/.test(title)) return { glyph: '●', kind: 'focus' };
+            if (/\b(call|zoom|meet|hangout|sync|1:1|1-on-1|standup|stand-up)\b/.test(title)) return { glyph: '○', kind: 'call' };
+            return { glyph: '◆', kind: 'meeting' };
+        }
+
+        // ── Activity log helpers (Iter 4) ──
+        function prismRelativeTime(ts) {
+            if (!ts) return '';
+            const diff = Math.max(0, Date.now() - ts);
+            if (diff < 60000) return Math.max(1, Math.floor(diff / 1000)) + 's';
+            if (diff < 3600000) return Math.floor(diff / 60000) + 'm';
+            if (diff < 86400000) return Math.floor(diff / 3600000) + 'h';
+            const d = new Date(ts);
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            return hh + ':' + mm;
+        }
+        function activityGlyphClass(type) {
+            const t = (type || '').toLowerCase();
+            if (t === 'add')   return 'add';
+            if (t === 'done')  return 'done';
+            if (t === 'stuck') return 'stuck';
+            if (t === 'moved') return 'move';
+            if (t === 'flow')  return 'flow';
+            if (t === 'sync')  return 'sync';
+            return '';
+        }
+        function renderActivityLogHtml() {
+            if (!activityLog || activityLog.length === 0) {
+                return '<div class="prism-activity-empty">No activity yet — changes will appear here.</div>';
+            }
+            const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            // Format "Name → Target" detail into styled spans if the arrow is present
+            return activityLog.slice(0, 18).map(e => {
+                let bodyHtml;
+                const arrowIdx = (e.detail || '').indexOf('→');
+                if (arrowIdx > 0) {
+                    const before = e.detail.slice(0, arrowIdx).trim();
+                    const after  = e.detail.slice(arrowIdx + 1).trim();
+                    bodyHtml = `<span class="ac-target">${esc(before)}</span><span class="ac-arrow">→</span><span class="ac-to">${esc(after)}</span>`;
+                } else {
+                    bodyHtml = `<span class="ac-target">${esc(e.detail || '')}</span>`;
+                }
+                return `<div class="prism-activity-row">
+                    <span class="prism-activity-time">${prismRelativeTime(e.t)}</span>
+                    <span class="prism-activity-glyph ${activityGlyphClass(e.type)}">${esc((e.type || '').slice(0,5))}</span>
+                    <span class="prism-activity-body">${bodyHtml}</span>
+                </div>`;
+            }).join('');
+        }
+        function renderActivityLogTile() {
+            const body = document.getElementById('prismActivityLogBody');
+            if (body) body.innerHTML = renderActivityLogHtml();
+        }
+        function hotkeyRow(label, keys) {
+            const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const keyHtml = keys.map((k, i) => {
+                const sep = i > 0 ? '<span class="plus">+</span>' : '';
+                return sep + `<kbd>${esc(k)}</kbd>`;
+            }).join('');
+            return `<div class="prism-hotkey-row"><span class="prism-hotkey-label">${esc(label)}</span><span class="prism-hotkey-keys">${keyHtml}</span></div>`;
+        }
+
+        function prismRelativeDay(dateStr) {
+            if (!dateStr) return '—';
+            const due = new Date(dateStr + 'T00:00:00');
+            const now = new Date(); now.setHours(0,0,0,0);
+            const diff = Math.round((due - now) / 86400000);
+            if (diff < 0) return Math.abs(diff) + 'd overdue';
+            if (diff === 0) return 'Today';
+            if (diff === 1) return 'Tomorrow';
+            if (diff < 7) return 'in ' + diff + 'd';
+            return due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        // ── Legacy dashboard (kept for non-Prism themes) ──
+        function renderLegacyDashboard(container) {
             const allTasks = appData.groups.flatMap(g => g.tasks.map(t => ({...t, groupName: g.title, groupColor: g.color})));
             const total = allTasks.length;
             const byStatus = {};
@@ -4416,7 +7645,27 @@
                 </div>`;
             }
 
-            container.innerHTML = `<div class="notes-container">${sidebarHtml}<div class="notes-resizer" id="notesResizer"></div>${editorHtml}</div>`;
+            // Prism editorial masthead (Iter 7) prepended above the two-column notes layout
+            let mastheadHtml = '';
+            const isPrismNotes = document.body.classList.contains('prism-theme');
+            if (isPrismNotes) {
+                const total = (notesData.notes || []).length;
+                const pinned = (notesData.notes || []).filter(n => n.pinned).length;
+                const folderCount = getNoteFolders().length;
+                const filteredCount = filtered.length;
+                const currentFolder = currentNoteFolder || 'All';
+                mastheadHtml = renderPrismViewMasthead({
+                    title: 'Notes',
+                    tagline: `${currentFolder} · ${filteredCount} of ${total} visible`,
+                    kpis: [
+                        { label: 'Notes',    value: total,        icon: '∎', color: 'var(--pr-ink)' },
+                        { label: 'Pinned',   value: pinned,       icon: '☆', color: 'var(--pr-amber)' },
+                        { label: 'Folders',  value: folderCount,  icon: '◈', color: 'var(--pr-accent)' },
+                        { label: 'Visible',  value: filteredCount, icon: '◉', color: 'var(--pr-green)' }
+                    ]
+                });
+            }
+            container.innerHTML = `${mastheadHtml}<div class="notes-container">${sidebarHtml}<div class="notes-resizer" id="notesResizer"></div>${editorHtml}</div>`;
             initNotesResizer();
             initSlashCommand();
             initNoteImageDrop();

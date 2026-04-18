@@ -41,3 +41,11 @@ index_*.html
 
 # === Test scratch ===
 .flowdesk-push-test.txt
+
+# === Session scratch (Prism iter backups + QA shots) ===
+_backups/
+_qa_iter7/
+*.prism-backup
+qa_web_*.py
+qa_flowdesk.py
+qa_screenshots.py

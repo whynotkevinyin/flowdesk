@@ -34,7 +34,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import (
     Qt, QSize, QDate, QTime, QTimer, pyqtSignal, QMimeData, QPoint,
-    QPropertyAnimation, QEasingCurve
+    QPropertyAnimation, QEasingCurve, QSettings
 )
 from PyQt6.QtGui import (
     QColor, QPalette, QFont, QIcon, QAction, QPainter,
@@ -136,6 +136,156 @@ DARK_THEME = {
     "sync_btn_hover":        "rgba(255,255,255,0.2)",
     "sync_btn_color":        "#ffffff",
 }
+
+# ─── 5-Skin System (mirrors web's PRISM_SKIN_MAP) ────────────────
+# Each skin is a full theme dict compatible with build_global_qss() and every
+# per-widget set_theme() call. isDark controls hover/input overlays so buttons
+# read correctly on dark vs light backgrounds.
+def _make_skin(bg, sidebar, text, text_dim, border, accent, card, card_hover, toolbar, is_dark):
+    overlay_alpha = "255,255,255" if is_dark else "0,0,0"
+    return {
+        "bg":          bg,
+        "card_bg":     card,
+        "header_bg":   toolbar,
+        "header_fg":   text,
+        "text":        text,
+        "text_dim":    text_dim,
+        "border":      border,
+        "section_bg":  sidebar,
+        "accent":      accent,
+        "shadow":      f"rgba(0,0,0,{'0.25' if is_dark else '0.06'})",
+        "toolbar_input_bg":      f"rgba({overlay_alpha},{'0.12' if is_dark else '0.05'})",
+        "toolbar_input_border":  f"rgba({overlay_alpha},{'0.15' if is_dark else '0.10'})",
+        "toolbar_input_color":   text,
+        "toolbar_placeholder":   f"rgba({overlay_alpha},{'0.50' if is_dark else '0.40'})",
+        "toolbar_btn_hover":     f"rgba({overlay_alpha},{'0.15' if is_dark else '0.08'})",
+        "toolbar_btn_color":     text,
+        "sync_btn_bg":           f"rgba({overlay_alpha},{'0.10' if is_dark else '0.06'})",
+        "sync_btn_hover":        f"rgba({overlay_alpha},{'0.20' if is_dark else '0.12'})",
+        "sync_btn_color":        text,
+        "_is_dark":    is_dark,
+        "_accent_2":   accent,
+    }
+
+PRISM_SKIN   = _make_skin("#EEF0F5", "#F4F5F9", "#1B1D2B", "#6B6F82", "#E2E4EC", "#4A5CC9", "#FFFFFF", "#F4F5F9", "#F4F5F9", False)
+ATLAS_SKIN   = _make_skin("#F4EFE7", "#F0EADF", "#2C2419", "#7A6F5F", "#E3DBCB", "#B24A2D", "#FBF7EF", "#F0EADF", "#F0EADF", False)
+MISSION_SKIN = _make_skin("#141516", "#1B1D1F", "#E8E6E1", "#8A8680", "#2B2E31", "#E89A3C", "#222527", "#2B2E31", "#1B1D1F", True)
+HORIZON_SKIN = _make_skin("#F0EDE6", "#E8E4DA", "#23302A", "#6B7A72", "#D8D3C7", "#7B9880", "#FAF8F3", "#E8E4DA", "#E8E4DA", False)
+EMBER_SKIN   = _make_skin("#0F1512", "#141B17", "#E8E4DA", "#7E8A82", "#233028", "#5FB39A", "#1A221D", "#233028", "#141B17", True)
+
+SKIN_THEMES = {
+    "prism":   PRISM_SKIN,
+    "atlas":   ATLAS_SKIN,
+    "mission": MISSION_SKIN,
+    "horizon": HORIZON_SKIN,
+    "ember":   EMBER_SKIN,
+}
+SKIN_LABELS = {
+    "prism":   ("Prism",   "Cool indigo bento",      "#4A5CC9"),
+    "atlas":   ("Atlas",   "Warm paper, editorial",  "#B24A2D"),
+    "mission": ("Mission", "Dark operator console",  "#E89A3C"),
+    "horizon": ("Horizon", "Sage garden calm",       "#7B9880"),
+    "ember":   ("Ember",   "Deep teal focus",        "#5FB39A"),
+}
+SKIN_ORDER = ["prism", "atlas", "mission", "horizon", "ember"]
+
+# Keep legacy LIGHT/DARK aliases so any downstream code that references them
+# stays in working order. Light = Prism (cool bento), Dark = Mission (operator).
+LIGHT_THEME = PRISM_SKIN
+DARK_THEME = MISSION_SKIN
+
+
+# ─── Bento / Atlas editorial content ─────────────────────────
+ATLAS_TAGLINES = [
+    "Of ledgers, letters, and light.",
+    "All the work that's fit to ship.",
+    "Process, published daily.",
+    "The unhurried edition.",
+    "Bound by craft, carried by calendar.",
+    "A folio of open loops.",
+    "Type, time, and tasks in good order.",
+]
+
+ATLAS_QUOTES = [
+    ("Discipline equals freedom.",                 "Jocko Willink"),
+    ("The way to get started is to quit talking and begin doing.", "Walt Disney"),
+    ("Slow is smooth. Smooth is fast.",            "Military adage"),
+    ("Simplicity is the ultimate sophistication.", "Leonardo da Vinci"),
+    ("Make it work, make it right, make it fast.", "Kent Beck"),
+    ("The best time to plant a tree was 20 years ago. The second best time is now.", "Folk wisdom"),
+    ("Done is better than perfect.",               "Sheryl Sandberg"),
+    ("What gets measured gets managed.",           "Peter Drucker"),
+    ("Focus is saying no.",                         "Steve Jobs"),
+    ("Perfection is the enemy of good.",            "Voltaire"),
+    ("A goal without a plan is just a wish.",       "Antoine de Saint-Exupéry"),
+]
+
+# Hotkey legend rendered in the Bento Dashboard's hotkey tile.
+HOTKEY_ROWS = [
+    ("New task",     ["⌘", "N"]),
+    ("Focus search", ["⌘", "K"]),
+    ("Quick sync",   ["⌘", "/"]),
+    ("Focus mode",   ["⌘", "⇧", "F"]),
+    ("Cycle skin",   ["⌘", "⇧", "T"]),
+    ("Jump: Home",   ["g", "h"]),
+    ("Jump: Flows",  ["g", "f"]),
+    ("Jump: Board",  ["g", "b"]),
+]
+
+
+def day_of_year(d=None):
+    """1-indexed day of year for the given date (default today)."""
+    if d is None:
+        d = date.today()
+    start = date(d.year, 1, 1)
+    return (d - start).days + 1
+
+
+def atlas_quote_of_day(d=None):
+    """Deterministic quote rotation keyed by day of year."""
+    idx = day_of_year(d) % len(ATLAS_QUOTES)
+    return ATLAS_QUOTES[idx]
+
+
+def atlas_tagline_of_day(d=None):
+    idx = day_of_year(d) % len(ATLAS_TAGLINES)
+    return ATLAS_TAGLINES[idx]
+
+
+def serif_font_family(skin_name):
+    """Return a serif family string for skins that want editorial type."""
+    if skin_name in ("atlas", "ember"):
+        return '"Spectral", "Source Serif Pro", "Georgia", "Times New Roman", serif'
+    return '"Helvetica Neue", -apple-system, "Segoe UI", sans-serif'
+
+
+def classify_event_glyph(title):
+    """Return (glyph, kind) tuple used by Calendar/dashboard event rows."""
+    t = (title or "").lower()
+    import re
+    if re.search(r"\b(focus|deep\s*work|writing|heads[-\s]?down)\b", t):
+        return ("●", "focus")
+    if re.search(r"\b(call|zoom|meet|hangout|sync|1:1|1-on-1|standup|stand-up)\b", t):
+        return ("○", "call")
+    return ("◆", "meeting")
+
+
+def priority_to_token(priority):
+    """Map a priority string to a (level, label) token used by the P0/P1/P2 UI."""
+    if not priority:
+        return None
+    p = str(priority).strip().lower()
+    if p in ("", "none", "—"):
+        return None
+    if p in ("critical", "urgent", "p0"):
+        return ("p0", "P0")
+    if p in ("high", "p1"):
+        return ("p1", "P1")
+    if p in ("medium", "med", "p2"):
+        return ("p2", "P2")
+    if p in ("low", "p3"):
+        return ("p3", "P3")
+    return ("p2", "P2")
 
 
 # ─── Stylesheets ─────────────────────────────────────────────
@@ -389,6 +539,14 @@ class Database:
                 task_name   TEXT,
                 deleted_at  TEXT    NOT NULL DEFAULT (datetime('now'))
             );
+
+            CREATE TABLE IF NOT EXISTS activity_log (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts         TEXT    NOT NULL DEFAULT (datetime('now')),
+                kind       TEXT    NOT NULL,
+                target     TEXT    NOT NULL DEFAULT '',
+                detail     TEXT    NOT NULL DEFAULT ''
+            );
         """)
         self.conn.commit()
         self._migrate()
@@ -478,13 +636,23 @@ class Database:
             (group_id, name, max_order + 1)
         )
         self.conn.commit()
+        self._log_activity("ADD", name, f"group#{group_id}")
         return cur.lastrowid
 
     def update_task(self, tid, **kwargs):
+        # Snapshot name + prior status so we can build readable activity rows.
+        prior = self.conn.execute(
+            "SELECT name, status FROM tasks WHERE id=?", (tid,)
+        ).fetchone()
         sets = ", ".join(f"{k}=?" for k in kwargs)
         vals = list(kwargs.values()) + [tid]
         self.conn.execute(f"UPDATE tasks SET {sets} WHERE id=?", vals)
         self.conn.commit()
+        if prior is not None and "status" in kwargs:
+            new_status = kwargs.get("status")
+            if new_status != prior["status"]:
+                kind = "DONE" if new_status == "Done" else ("STUCK" if new_status == "Stuck" else "MOVED")
+                self._log_activity(kind, prior["name"] or "", f"{prior['status']}→{new_status}")
 
     def delete_task(self, tid):
         # Record deletion for sync
@@ -497,12 +665,48 @@ class Database:
                 "INSERT INTO sync_deletions(item_type, group_name, task_name) VALUES ('task', ?, ?)",
                 (row["group_name"], row["task_name"])
             )
+            self._log_activity("DEL", row["task_name"] or "", row["group_name"] or "")
         self.conn.execute("DELETE FROM tasks WHERE id=?", (tid,))
         self.conn.commit()
 
     def move_task(self, tid, new_group_id):
+        # Resolve names for activity log before mutating.
+        row = self.conn.execute(
+            "SELECT t.name as task_name, g.name as from_group FROM tasks t JOIN groups_ g ON t.group_id = g.id WHERE t.id=?",
+            (tid,)
+        ).fetchone()
+        to_group = self.conn.execute(
+            "SELECT name FROM groups_ WHERE id=?", (new_group_id,)
+        ).fetchone()
         self.conn.execute("UPDATE tasks SET group_id=? WHERE id=?", (new_group_id, tid))
         self.conn.commit()
+        if row and to_group:
+            self._log_activity("FLOW", row["task_name"] or "", f"{row['from_group']}→{to_group['name']}")
+
+    # ── Activity log ──
+    def _log_activity(self, kind, target, detail=""):
+        """Append an event to activity_log; trim to most recent 200 rows."""
+        try:
+            self.conn.execute(
+                "INSERT INTO activity_log(kind, target, detail) VALUES (?, ?, ?)",
+                (kind, target or "", detail or "")
+            )
+            # Trim — keep only the latest 200 rows.
+            self.conn.execute(
+                "DELETE FROM activity_log WHERE id NOT IN "
+                "(SELECT id FROM activity_log ORDER BY id DESC LIMIT 200)"
+            )
+            self.conn.commit()
+        except Exception:
+            # Never let logging take down a mutation.
+            pass
+
+    def get_recent_activity(self, limit=12):
+        rows = self.conn.execute(
+            "SELECT ts, kind, target, detail FROM activity_log ORDER BY id DESC LIMIT ?",
+            (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def get_tasks_by_date(self, date_str):
         return self.conn.execute(
@@ -1605,7 +1809,8 @@ class CalendarView(QWidget):
         items = date_events.get(d_str, [])
         for i, (item_type, item) in enumerate(items[:3]):
             if item_type == "event":
-                pill = QLabel(item["title"][:15])
+                _glyph, _kind = classify_event_glyph(item.get("title", ""))
+                pill = QLabel(f"{_glyph} {item['title'][:14]}")
                 pill.setStyleSheet(f"""
                     background-color: {item['color']};
                     color: white; border-radius: 3px;
@@ -1690,7 +1895,9 @@ class CalendarView(QWidget):
                         except Exception:
                             ev_hour = 9
                         if ev_hour == hour:
-                            pill = QLabel(ev["title"][:12])
+                            _ev_title = ev["title"] if "title" in ev.keys() else ""
+                            _g, _k = classify_event_glyph(_ev_title)
+                            pill = QLabel(f"{_g} {_ev_title[:11]}")
                             pill.setStyleSheet(f"background-color: {ev['color']}; color: white; border-radius: 2px; padding: 1px 3px; font-size: 8px; font-weight: 600; border: none;")
                             pill.setCursor(Qt.CursorShape.PointingHandCursor)
                             eid = ev["id"]
@@ -1762,7 +1969,8 @@ class CalendarView(QWidget):
             time_lbl.setStyleSheet(f"color: {t['text_dim']}; font-size: 11px; font-weight: 600; min-width: 100px; border: none;")
             cl.addWidget(time_lbl)
 
-            title_lbl = QLabel(ev["title"])
+            _g, _k = classify_event_glyph(ev.get("title", ""))
+            title_lbl = QLabel(f"{_g}  {ev['title']}")
             title_lbl.setFont(QFont("Inter", 12, QFont.Weight.Medium))
             title_lbl.setStyleSheet("border: none;")
             cl.addWidget(title_lbl)
@@ -2772,14 +2980,17 @@ class RichTextEditor(QWidget):
 class DashboardPage(QWidget):
     """Visual overview dashboard with KPI cards, charts, and upcoming tasks."""
 
-    def __init__(self, db, theme, parent=None):
+    def __init__(self, db, theme, parent=None, skin_name="prism"):
         super().__init__(parent)
         self.db = db
         self.theme = theme
+        self.current_skin = skin_name
         self._build()
 
-    def set_theme(self, theme):
+    def set_theme(self, theme, skin_name=None):
         self.theme = theme
+        if skin_name is not None:
+            self.current_skin = skin_name
         self.refresh()
 
     def _build(self):
@@ -2798,10 +3009,18 @@ class DashboardPage(QWidget):
     def _clear_layout(self, layout):
         while layout.count():
             item = layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-            elif item.layout():
-                self._clear_layout(item.layout())
+            w = item.widget()
+            if w is not None:
+                # setParent(None) removes the widget from the view synchronously
+                # (deleteLater alone is async and leaves ghost widgets on screen
+                # until the next event loop iteration).
+                w.setParent(None)
+                w.deleteLater()
+            else:
+                sub = item.layout()
+                if sub is not None:
+                    self._clear_layout(sub)
+                    sub.deleteLater()
 
     def refresh(self):
         self._clear_layout(self.main_vbox)
@@ -2842,6 +3061,25 @@ class DashboardPage(QWidget):
                ORDER BY t.due_date ASC LIMIT 10"""
         ).fetchall()
 
+        # Today's agenda — due today or currently working on it.
+        today_str = date.today().strftime("%Y-%m-%d")
+        agenda_rows = self.db.conn.execute(
+            """SELECT t.name, t.status, t.priority, t.due_date, g.name as group_name, g.color as group_color
+               FROM tasks t JOIN groups_ g ON t.group_id = g.id
+               WHERE t.status != 'Done' AND (t.due_date = ? OR t.status = 'Working on it')
+               ORDER BY
+                 CASE t.status WHEN 'Working on it' THEN 0 ELSE 1 END,
+                 CASE t.priority WHEN 'Critical' THEN 0 WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 ELSE 4 END,
+                 t.name LIMIT 8""",
+            (today_str,)
+        ).fetchall()
+        agenda_tasks = [dict(r) for r in agenda_rows]
+
+        activity = self.db.get_recent_activity(limit=10)
+
+        # ── Atlas masthead ──
+        self.main_vbox.addWidget(self._masthead())
+
         # ── Row 0: KPI Cards (3 + 3) ──
         kpi_data = [
             ("Total Tasks", str(total), t["accent"]),
@@ -2872,7 +3110,282 @@ class DashboardPage(QWidget):
         row2.addWidget(self._upcoming_tasks(upcoming_tasks), 1)
         self.main_vbox.addLayout(row2)
 
+        # ── Row 3: Today's Agenda (2x) + Quote (1x) ──
+        row3 = QHBoxLayout()
+        row3.setSpacing(14)
+        row3.addWidget(self._today_agenda_card(agenda_tasks), 2)
+        row3.addWidget(self._quote_card(), 1)
+        self.main_vbox.addLayout(row3)
+
+        # ── Row 4: Activity Log (2x) + Hotkey Legend (1x) ──
+        row4 = QHBoxLayout()
+        row4.setSpacing(14)
+        row4.addWidget(self._activity_log_card(activity), 2)
+        row4.addWidget(self._hotkey_legend_card(), 1)
+        self.main_vbox.addLayout(row4)
+
         self.main_vbox.addStretch()
+
+    # ── Bento tiles ──
+    def _masthead(self):
+        """Atlas-style editorial banner across the top of the dashboard."""
+        t = self.theme
+        is_serif_skin = self.current_skin in ("atlas", "ember")
+        title_family = serif_font_family(self.current_skin) if is_serif_skin else '"Helvetica Neue", -apple-system, sans-serif'
+
+        frame = QFrame()
+        # Double border top/bottom to mimic the web masthead.
+        frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: transparent;
+                border-top: 3px double {t['border']};
+                border-bottom: 1px solid {t['border']};
+                padding: 10px 2px 12px 2px;
+            }}
+            QLabel {{ border: none; padding: 0; background: transparent; }}
+        """)
+        vbox = QVBoxLayout(frame)
+        vbox.setContentsMargins(0, 10, 0, 12)
+        vbox.setSpacing(2)
+
+        issue = day_of_year()
+        tagline = atlas_tagline_of_day()
+        date_str = date.today().strftime("%A, %B %d, %Y")
+
+        issue_lbl = QLabel(f"VOL. II  ·  ISSUE NO. {issue:03d}")
+        issue_lbl.setStyleSheet(
+            f"color: {t['text_dim']}; font-size: 10px; font-weight: 700; letter-spacing: 2px;"
+        )
+        issue_lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        vbox.addWidget(issue_lbl)
+
+        title_lbl = QLabel("The Flowdesk Daily")
+        title_size = 38 if is_serif_skin else 30
+        weight = "700" if is_serif_skin else "800"
+        title_lbl.setStyleSheet(
+            f"color: {t['text']}; font-family: {title_family}; font-size: {title_size}px; "
+            f"font-weight: {weight}; letter-spacing: -0.5px;"
+        )
+        title_lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        vbox.addWidget(title_lbl)
+
+        meta_lbl = QLabel(f"{date_str}  ·  {tagline}")
+        meta_lbl.setStyleSheet(
+            f"color: {t['text_dim']}; font-size: 11px; font-style: italic;"
+        )
+        meta_lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        vbox.addWidget(meta_lbl)
+
+        return frame
+
+    def _today_agenda_card(self, tasks):
+        frame, layout = self._card_frame("Today's Agenda")
+        t = self.theme
+
+        if not tasks:
+            empty = QLabel("No agenda items — enjoy the quiet.")
+            empty.setStyleSheet(f"color: {t['text_dim']}; font-size: 12px; border: none;")
+            layout.addWidget(empty)
+            layout.addStretch()
+            return frame
+
+        is_atlas = self.current_skin == "atlas"
+        num_family = serif_font_family(self.current_skin) if is_atlas else '"SF Mono", Menlo, monospace'
+
+        for idx, task in enumerate(tasks, start=1):
+            row = QHBoxLayout()
+            row.setSpacing(10)
+
+            # Numbered tag (serif-italic in Atlas, mono elsewhere).
+            num = QLabel(f"{idx:02d}.")
+            num.setFixedWidth(28)
+            if is_atlas:
+                num.setStyleSheet(
+                    f"color: {t['accent']}; font-family: {num_family}; font-size: 15px; "
+                    f"font-style: italic; border: none; padding: 0;"
+                )
+            else:
+                num.setStyleSheet(
+                    f"color: {t['text_dim']}; font-family: {num_family}; font-size: 11px; "
+                    f"font-weight: 700; border: none; padding: 0;"
+                )
+            row.addWidget(num)
+
+            name = QLabel(task.get("name") or "")
+            name.setStyleSheet(
+                f"color: {t['text']}; font-size: 13px; font-weight: 600; border: none; padding: 0;"
+            )
+            row.addWidget(name, 1)
+
+            # Priority token (P0/P1/P2/P3).
+            tok = priority_to_token(task.get("priority"))
+            if tok is not None:
+                level, label = tok
+                prio_lbl = QLabel(label)
+                prio_lbl.setFixedWidth(26)
+                prio_color = {"p0": "#e2445c", "p1": "#fdab3d", "p2": "#0073ea", "p3": t['text_dim']}[level]
+                prio_lbl.setStyleSheet(
+                    f"color: {prio_color}; background: transparent; "
+                    f"border: 1px solid {prio_color}; border-radius: 3px; "
+                    f"font-family: 'SF Mono', Menlo, monospace; font-size: 9px; "
+                    f"font-weight: 700; padding: 1px 4px; letter-spacing: 0.08em;"
+                )
+                prio_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                row.addWidget(prio_lbl)
+
+            # Group chip
+            grp = QLabel(task.get("group_name") or "")
+            grp.setStyleSheet(
+                f"color: white; background-color: {task.get('group_color') or '#999'}; "
+                f"font-size: 10px; font-weight: 600; border-radius: 8px; "
+                f"padding: 2px 8px; border: none;"
+            )
+            row.addWidget(grp)
+
+            # Status dot
+            status = task.get("status") or "Not Started"
+            status_color = STATUS_COLORS.get(status, "#999")
+            dot = QLabel("●")
+            dot.setFixedWidth(14)
+            dot.setStyleSheet(f"color: {status_color}; font-size: 12px; border: none; padding: 0;")
+            dot.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            row.addWidget(dot)
+
+            layout.addLayout(row)
+
+        layout.addStretch()
+        return frame
+
+    def _quote_card(self):
+        """Daily-rotating Atlas-style pull quote."""
+        t = self.theme
+        text, author = atlas_quote_of_day()
+        frame, layout = self._card_frame()
+
+        serif = serif_font_family(self.current_skin)
+
+        # Giant decorative quote mark.
+        mark = QLabel('\u201C')
+        mark.setStyleSheet(
+            f"color: {t['accent']}; font-family: {serif}; font-size: 64px; "
+            f"font-weight: 700; border: none; padding: 0; margin: -6px 0 -14px 0;"
+        )
+        layout.addWidget(mark)
+
+        body = QLabel(text)
+        body.setWordWrap(True)
+        body.setStyleSheet(
+            f"color: {t['text']}; font-family: {serif}; font-size: 16px; "
+            f"font-style: italic; line-height: 140%; border: none; padding: 0;"
+        )
+        layout.addWidget(body)
+
+        author_lbl = QLabel(f"— {author}")
+        author_lbl.setStyleSheet(
+            f"color: {t['text_dim']}; font-family: 'SF Mono', Menlo, monospace; "
+            f"font-size: 11px; font-weight: 600; letter-spacing: 0.05em; border: none; "
+            f"padding: 6px 0 0 0;"
+        )
+        layout.addWidget(author_lbl)
+
+        layout.addStretch()
+        return frame
+
+    def _activity_log_card(self, entries):
+        frame, layout = self._card_frame("Activity Log")
+        t = self.theme
+
+        if not entries:
+            empty = QLabel("No activity yet — mutations will show up here.")
+            empty.setStyleSheet(f"color: {t['text_dim']}; font-size: 12px; border: none;")
+            layout.addWidget(empty)
+            layout.addStretch()
+            return frame
+
+        kind_colors = {
+            "ADD":   "#00c875",
+            "DONE":  "#00c875",
+            "STUCK": "#e2445c",
+            "MOVED": "#0073ea",
+            "FLOW":  "#a25ddc",
+            "DEL":   "#e2445c",
+        }
+
+        for entry in entries:
+            ts = (entry.get("ts") or "")[-8:-3]  # "HH:MM" from "YYYY-MM-DD HH:MM:SS"
+            kind = entry.get("kind") or ""
+            target = entry.get("target") or ""
+            detail = entry.get("detail") or ""
+
+            row = QHBoxLayout()
+            row.setSpacing(10)
+
+            ts_lbl = QLabel(ts or "")
+            ts_lbl.setFixedWidth(46)
+            ts_lbl.setStyleSheet(
+                f"color: {t['text_dim']}; font-family: 'SF Mono', Menlo, monospace; "
+                f"font-size: 11px; border: none; padding: 0;"
+            )
+            row.addWidget(ts_lbl)
+
+            kind_lbl = QLabel(kind)
+            kind_lbl.setFixedWidth(56)
+            kcolor = kind_colors.get(kind, t['text_dim'])
+            kind_lbl.setStyleSheet(
+                f"color: {kcolor}; font-family: 'SF Mono', Menlo, monospace; "
+                f"font-size: 10px; font-weight: 700; letter-spacing: 0.06em; "
+                f"border: 1px solid {kcolor}; border-radius: 3px; padding: 1px 5px;"
+            )
+            kind_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            row.addWidget(kind_lbl)
+
+            target_lbl = QLabel(target)
+            target_lbl.setStyleSheet(
+                f"color: {t['text']}; font-size: 12px; font-weight: 600; border: none; padding: 0;"
+            )
+            row.addWidget(target_lbl, 1)
+
+            if detail:
+                detail_lbl = QLabel(f"→ {detail}")
+                detail_lbl.setStyleSheet(
+                    f"color: {t['text_dim']}; font-size: 11px; border: none; padding: 0;"
+                )
+                row.addWidget(detail_lbl)
+
+            layout.addLayout(row)
+
+        layout.addStretch()
+        return frame
+
+    def _hotkey_legend_card(self):
+        frame, layout = self._card_frame("Hotkeys")
+        t = self.theme
+
+        for label, keys in HOTKEY_ROWS:
+            row = QHBoxLayout()
+            row.setSpacing(6)
+
+            name = QLabel(label)
+            name.setStyleSheet(
+                f"color: {t['text_dim']}; font-size: 11px; border: none; padding: 0;"
+            )
+            row.addWidget(name, 1)
+
+            for k in keys:
+                key_lbl = QLabel(k)
+                key_lbl.setStyleSheet(
+                    f"color: {t['text']}; background-color: {t['section_bg']}; "
+                    f"border: 1px solid {t['border']}; border-radius: 4px; "
+                    f"font-family: 'SF Mono', Menlo, monospace; font-size: 10px; "
+                    f"font-weight: 600; padding: 1px 5px; min-width: 14px;"
+                )
+                key_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                row.addWidget(key_lbl)
+
+            layout.addLayout(row)
+
+        layout.addStretch()
+        return frame
 
     def _card_frame(self, title=""):
         t = self.theme
@@ -3176,6 +3689,646 @@ class _DonutChartWidget(QWidget):
         painter.drawText(hole_rect, Qt.AlignmentFlag.AlignCenter, f"{pct}%")
 
         painter.end()
+
+
+# ─── Timeline View (Horizon 14-day ribbon) ───────────────────
+class TimelineView(QWidget):
+    """14-day horizontal timeline — one row per flow, tasks as pills at their due date column.
+
+    Mirrors the web's Horizon Timeline. Range: today-3 … today+10.
+    """
+
+    task_clicked = pyqtSignal(int)  # task id
+    DAY_OFFSETS = list(range(-3, 11))
+    DAY_WIDTH = 82
+    FLOW_COL_WIDTH = 170
+
+    def __init__(self, db, theme, parent=None, skin_name="prism"):
+        super().__init__(parent)
+        self.db = db
+        self.theme = theme
+        self.current_skin = skin_name
+        self._build()
+
+    def set_theme(self, theme, skin_name=None):
+        self.theme = theme
+        if skin_name is not None:
+            self.current_skin = skin_name
+        self.refresh()
+
+    def _build(self):
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+        self.container = QWidget()
+        self.vbox = QVBoxLayout(self.container)
+        self.vbox.setContentsMargins(16, 14, 16, 14)
+        self.vbox.setSpacing(10)
+
+        self.scroll.setWidget(self.container)
+        outer.addWidget(self.scroll)
+        self.refresh()
+
+    def _clear_layout(self, layout):
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                # setParent(None) removes the widget from the view synchronously
+                # (deleteLater alone is async and leaves ghost widgets on screen
+                # until the next event loop iteration).
+                w.setParent(None)
+                w.deleteLater()
+            else:
+                sub = item.layout()
+                if sub is not None:
+                    self._clear_layout(sub)
+                    sub.deleteLater()
+
+    def refresh(self):
+        self._clear_layout(self.vbox)
+        t = self.theme
+
+        # ── Title strip ──
+        title_row = QHBoxLayout()
+        title_row.setSpacing(10)
+        title_lbl = QLabel("Timeline")
+        title_lbl.setStyleSheet(
+            f"color: {t['text']}; font-size: 18px; font-weight: 800; border: none; padding: 0;"
+        )
+        title_row.addWidget(title_lbl)
+        sub_lbl = QLabel("14-day window · today − 3 through today + 10")
+        sub_lbl.setStyleSheet(
+            f"color: {t['text_dim']}; font-size: 11px; border: none; padding-top: 5px;"
+        )
+        title_row.addWidget(sub_lbl)
+        title_row.addStretch()
+        self.vbox.addLayout(title_row)
+
+        # ── Scrollable ribbon grid ──
+        today = date.today()
+        days = [today + timedelta(days=off) for off in self.DAY_OFFSETS]
+
+        # Use QGridLayout for header + data rows.
+        grid_frame = QFrame()
+        grid_frame.setStyleSheet(
+            f"QFrame {{ background-color: {t['card_bg']}; border: 1px solid {t['border']}; "
+            f"border-radius: 10px; }}"
+        )
+        grid = QGridLayout(grid_frame)
+        grid.setContentsMargins(2, 2, 2, 2)
+        grid.setSpacing(0)
+
+        # Header row (row 0): flow label + 14 day headers.
+        hdr = QLabel("FLOW / DAY")
+        hdr.setFixedSize(self.FLOW_COL_WIDTH, 42)
+        hdr.setStyleSheet(
+            f"color: {t['text_dim']}; font-size: 10px; font-weight: 700; "
+            f"letter-spacing: 0.08em; border-bottom: 1px solid {t['border']}; "
+            f"padding-left: 10px; background: transparent;"
+        )
+        hdr.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        grid.addWidget(hdr, 0, 0)
+
+        for i, d in enumerate(days):
+            is_today = d == today
+            is_weekend = d.weekday() >= 5
+            is_past = d < today
+            fg = t['accent'] if is_today else t['text']
+            bg = t['section_bg'] if is_weekend else "transparent"
+            weight = "800" if is_today else "600"
+            day_label = QLabel(f"{d.strftime('%a')}\n{d.day}")
+            day_label.setFixedSize(self.DAY_WIDTH, 42)
+            day_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            border_bot = f"2px solid {t['accent']}" if is_today else f"1px solid {t['border']}"
+            opacity = 0.6 if is_past and not is_today else 1.0
+            day_label.setStyleSheet(
+                f"color: {fg}; font-size: 10px; font-weight: {weight}; "
+                f"background-color: {bg}; border-bottom: {border_bot}; "
+                f"padding: 4px 0;"
+            )
+            day_label.setGraphicsEffect(None)  # ensure no lingering effect
+            grid.addWidget(day_label, 0, i + 1)
+
+        # Data rows — one per group.
+        groups = self.db.get_groups()
+        if not groups:
+            empty = QLabel("No flows yet. Add a group + task with a due date.")
+            empty.setStyleSheet(
+                f"color: {t['text_dim']}; font-size: 12px; padding: 24px; border: none;"
+            )
+            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            grid.addWidget(empty, 1, 0, 1, 15)
+
+        for row_idx, g in enumerate(groups, start=1):
+            # Flow label column
+            flow_lbl = QFrame()
+            flow_lbl.setFixedWidth(self.FLOW_COL_WIDTH)
+            flow_lbl.setMinimumHeight(56)
+            flow_lbl.setStyleSheet(
+                f"QFrame {{ border-left: 3px solid {g['color']}; "
+                f"border-bottom: 1px solid {t['border']}; background: transparent; }}"
+            )
+            flow_vbox = QVBoxLayout(flow_lbl)
+            flow_vbox.setContentsMargins(10, 8, 6, 6)
+            flow_vbox.setSpacing(2)
+            name = QLabel(g['name'])
+            name.setStyleSheet(
+                f"color: {t['text']}; font-size: 12px; font-weight: 700; border: none; padding: 0;"
+            )
+            flow_vbox.addWidget(name)
+            # Task count subline
+            gtasks = [dict(tt) for tt in self.db.get_tasks(g['id'])]
+            done = sum(1 for tt in gtasks if tt['status'] == 'Done')
+            sub = QLabel(f"{done}/{len(gtasks)} done")
+            sub.setStyleSheet(
+                f"color: {t['text_dim']}; font-size: 10px; border: none; padding: 0;"
+            )
+            flow_vbox.addWidget(sub)
+            flow_vbox.addStretch()
+            grid.addWidget(flow_lbl, row_idx, 0)
+
+            # Compute tasks per day column (0-13)
+            tasks_by_col = {i: [] for i in range(14)}
+            for tt in gtasks:
+                due = tt.get('due_date')
+                if not due:
+                    continue
+                try:
+                    dd = datetime.strptime(due, '%Y-%m-%d').date()
+                    off = (dd - today).days
+                    col = off - self.DAY_OFFSETS[0]
+                    if 0 <= col < 14:
+                        tasks_by_col[col].append(tt)
+                except (ValueError, TypeError):
+                    pass
+
+            # Day cells
+            for i, d in enumerate(days):
+                is_today = d == today
+                is_weekend = d.weekday() >= 5
+                cell_bg = t['section_bg'] if is_weekend else "transparent"
+                cell = QFrame()
+                cell.setFixedWidth(self.DAY_WIDTH)
+                cell.setMinimumHeight(56)
+                border_right = f"1px solid {t['border']}"
+                border_bottom = f"1px solid {t['border']}"
+                border_top = f"2px solid {t['accent']}" if is_today else "none"
+                cell.setStyleSheet(
+                    f"QFrame {{ background-color: {cell_bg}; "
+                    f"border-right: {border_right}; border-bottom: {border_bottom}; "
+                    f"border-top: {border_top}; }}"
+                )
+                cell_vbox = QVBoxLayout(cell)
+                cell_vbox.setContentsMargins(3, 3, 3, 3)
+                cell_vbox.setSpacing(3)
+                for tt in tasks_by_col[i]:
+                    pill = self._make_pill(tt, g['color'])
+                    cell_vbox.addWidget(pill)
+                cell_vbox.addStretch()
+                grid.addWidget(cell, row_idx, i + 1)
+
+        # Wrap in horizontal scroll friendliness.
+        self.vbox.addWidget(grid_frame)
+
+        # ── Legend ──
+        legend = QHBoxLayout()
+        legend.setSpacing(16)
+        for status in ["Not Started", "Working on it", "Waiting for review", "Stuck", "Done"]:
+            chip = QHBoxLayout()
+            chip.setSpacing(4)
+            dot = QLabel("●")
+            dot.setStyleSheet(
+                f"color: {STATUS_COLORS.get(status, '#999')}; font-size: 12px; border: none; padding: 0;"
+            )
+            chip.addWidget(dot)
+            lab = QLabel(status)
+            lab.setStyleSheet(
+                f"color: {t['text_dim']}; font-size: 10px; border: none; padding: 0;"
+            )
+            chip.addWidget(lab)
+            wrap = QWidget()
+            wrap.setLayout(chip)
+            legend.addWidget(wrap)
+        overdue_chip = QHBoxLayout()
+        overdue_chip.setSpacing(4)
+        od_box = QLabel("□")
+        od_box.setStyleSheet("color: #e2445c; font-size: 12px; border: none; padding: 0;")
+        overdue_chip.addWidget(od_box)
+        od_lbl = QLabel("Overdue")
+        od_lbl.setStyleSheet(f"color: {t['text_dim']}; font-size: 10px; border: none; padding: 0;")
+        overdue_chip.addWidget(od_lbl)
+        wrap = QWidget()
+        wrap.setLayout(overdue_chip)
+        legend.addWidget(wrap)
+        legend.addStretch()
+        self.vbox.addLayout(legend)
+
+        self.vbox.addStretch()
+
+    def _make_pill(self, task, group_color):
+        """Render a single task as a clickable colored pill."""
+        t = self.theme
+        status = task.get('status', 'Not Started')
+        status_color = STATUS_COLORS.get(status, '#999')
+        name = (task.get('name') or '').strip() or 'Untitled'
+
+        today = date.today()
+        overdue = False
+        try:
+            dd = datetime.strptime(task.get('due_date') or '', '%Y-%m-%d').date()
+            overdue = dd < today and status != 'Done'
+        except (ValueError, TypeError):
+            pass
+
+        pill = QLabel(name)
+        pill.setWordWrap(True)
+        pill.setMinimumHeight(22)
+        pill.setMaximumHeight(44)
+        pill.setToolTip(
+            f"{name}\nStatus: {status}\nDue: {task.get('due_date') or '—'}"
+            + (f"\nPriority: {task.get('priority')}" if task.get('priority') else "")
+        )
+        pill.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        is_done = status == 'Done'
+        bg = status_color if is_done else "transparent"
+        fg = "white" if is_done else t['text']
+        border = "2px solid #e2445c" if overdue else f"1px solid {status_color}"
+        # Slightly darkened left-border matching status to hint the swimlane.
+        pill.setStyleSheet(
+            f"QLabel {{ background-color: {bg}; color: {fg}; border: {border}; "
+            f"border-left: 3px solid {status_color}; border-radius: 4px; padding: 2px 6px; "
+            f"font-size: 10px; font-weight: 600; }}"
+        )
+
+        # Click → emit task_clicked.
+        tid = task.get('id')
+        def handler(ev, _tid=tid):
+            if _tid is not None:
+                self.task_clicked.emit(int(_tid))
+        pill.mousePressEvent = handler
+        return pill
+
+
+# ─── Focus Mode (Ember fullscreen) ────────────────────────────
+class FocusOverlay(QDialog):
+    """Ember-style full-screen focus mode with 50-min countdown.
+
+    Hotkeys while visible:
+        Esc            → exit
+        Space          → pause/resume
+        → / N          → next task
+        S              → mark Stuck
+        ⌘⏎ / Ctrl+⏎    → mark Done + advance
+    """
+
+    status_changed = pyqtSignal()
+    SESSION_SECONDS = 50 * 60
+
+    def __init__(self, db, theme, parent=None, skin_name="prism"):
+        super().__init__(parent)
+        self.db = db
+        self.theme = theme
+        self.current_skin = skin_name
+        self.task_id = None
+        self.remaining_sec = self.SESSION_SECONDS
+        self.paused = False
+        self._timer = QTimer(self)
+        self._timer.setInterval(1000)
+        self._timer.timeout.connect(self._on_tick)
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
+        self._build()
+
+    def set_theme(self, theme, skin_name=None):
+        self.theme = theme
+        if skin_name is not None:
+            self.current_skin = skin_name
+        if self.isVisible():
+            self._render()
+
+    def _build(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(48, 28, 48, 32)
+        root.setSpacing(18)
+
+        # Top bar: exit + timer
+        top = QHBoxLayout()
+        top.setSpacing(10)
+        self.exit_btn = QPushButton("✕ Exit")
+        self.exit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.exit_btn.clicked.connect(self.close)
+        top.addWidget(self.exit_btn)
+
+        top.addStretch()
+
+        self.pause_indicator = QLabel("")
+        top.addWidget(self.pause_indicator)
+
+        self.timer_lbl = QLabel("50:00")
+        self.timer_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        top.addWidget(self.timer_lbl)
+        root.addLayout(top)
+
+        root.addStretch(2)
+
+        # Middle: task title + meta
+        self.eyebrow_lbl = QLabel("NOW FOCUSING")
+        self.eyebrow_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        root.addWidget(self.eyebrow_lbl)
+
+        self.title_lbl = QLabel("")
+        self.title_lbl.setWordWrap(True)
+        self.title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        root.addWidget(self.title_lbl)
+
+        self.meta_lbl = QLabel("")
+        self.meta_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        root.addWidget(self.meta_lbl)
+
+        # Action buttons
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+        btn_row.addStretch()
+
+        self.done_btn = QPushButton("✓  Done  ⌘⏎")
+        self.done_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.done_btn.clicked.connect(lambda: self._mark_status("Done"))
+        btn_row.addWidget(self.done_btn)
+
+        self.stuck_btn = QPushButton("×  Stuck  S")
+        self.stuck_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.stuck_btn.clicked.connect(lambda: self._mark_status("Stuck"))
+        btn_row.addWidget(self.stuck_btn)
+
+        self.pause_btn = QPushButton("⏸  Pause  Space")
+        self.pause_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.pause_btn.clicked.connect(self._toggle_pause)
+        btn_row.addWidget(self.pause_btn)
+
+        self.next_btn = QPushButton("→  Next")
+        self.next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.next_btn.clicked.connect(self._next_task)
+        btn_row.addWidget(self.next_btn)
+
+        btn_row.addStretch()
+        root.addLayout(btn_row)
+
+        root.addStretch(3)
+
+        # Bottom: queue strip
+        self.queue_label = QLabel("UP NEXT")
+        self.queue_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        root.addWidget(self.queue_label)
+
+        self.queue_wrap = QWidget()
+        self.queue_row = QHBoxLayout(self.queue_wrap)
+        self.queue_row.setSpacing(8)
+        self.queue_row.setContentsMargins(0, 0, 0, 0)
+        root.addWidget(self.queue_wrap)
+
+    # ── Public API ──
+    def enter(self, task_id=None):
+        """Open focus mode. If task_id is None, pick earliest-due candidate."""
+        candidates = self._candidates()
+        if not candidates:
+            QMessageBox.information(self, "Focus", "Nothing to focus on — all clear.")
+            return False
+        if task_id is None:
+            task_id = candidates[0]["id"]
+        self.task_id = int(task_id)
+        self.remaining_sec = self.SESSION_SECONDS
+        self.paused = False
+        self._render()
+        self._timer.start()
+        self.showFullScreen()
+        self.activateWindow()
+        self.raise_()
+        self.setFocus()
+        try:
+            self.db._log_activity("FOCUS", self._get_task_name() or "", "entered")
+        except Exception:
+            pass
+        return True
+
+    def closeEvent(self, ev):
+        self._timer.stop()
+        super().closeEvent(ev)
+
+    # ── Data helpers ──
+    def _candidates(self, limit=10):
+        rows = self.db.conn.execute(
+            """SELECT t.id, t.name, t.status, t.priority, t.due_date,
+                      g.name AS group_name, g.color AS group_color
+               FROM tasks t JOIN groups_ g ON t.group_id = g.id
+               WHERE t.status != 'Done'
+               ORDER BY
+                 CASE WHEN t.due_date IS NULL OR t.due_date = '' THEN 1 ELSE 0 END,
+                 t.due_date ASC,
+                 CASE t.priority
+                   WHEN 'Critical' THEN 0 WHEN 'High' THEN 1
+                   WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 ELSE 4
+                 END,
+                 t.id ASC
+               LIMIT ?""",
+            (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def _current_task(self):
+        if self.task_id is None:
+            return None
+        row = self.db.conn.execute(
+            """SELECT t.id, t.name, t.status, t.priority, t.due_date,
+                      g.name AS group_name, g.color AS group_color
+               FROM tasks t JOIN groups_ g ON t.group_id = g.id
+               WHERE t.id = ?""",
+            (self.task_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def _get_task_name(self):
+        task = self._current_task()
+        return task["name"] if task else ""
+
+    # ── Rendering ──
+    def _render(self):
+        t = self.theme
+        serif = serif_font_family(self.current_skin)
+        is_dark = bool(t.get("_is_dark", False))
+
+        # Background + chrome styling
+        self.setStyleSheet(f"QDialog {{ background-color: {t['bg']}; }}")
+
+        self.exit_btn.setStyleSheet(
+            f"QPushButton {{ background: transparent; color: {t['text_dim']}; "
+            f"border: 1px solid {t['border']}; border-radius: 8px; padding: 6px 14px; "
+            f"font-size: 12px; font-weight: 600; }}"
+            f"QPushButton:hover {{ background: {t['section_bg']}; color: {t['text']}; }}"
+        )
+        self.timer_lbl.setStyleSheet(
+            f"color: {t['accent']}; font-family: 'SF Mono', Menlo, monospace; "
+            f"font-size: 32px; font-weight: 700; border: none;"
+        )
+        self.pause_indicator.setStyleSheet(
+            f"color: {t['text_dim']}; font-size: 11px; letter-spacing: 0.1em;"
+        )
+
+        self.eyebrow_lbl.setStyleSheet(
+            f"color: {t['text_dim']}; font-size: 11px; font-weight: 700; "
+            f"letter-spacing: 0.25em; border: none;"
+        )
+
+        # Title
+        task = self._current_task()
+        if not task:
+            self.title_lbl.setText("No task in focus")
+            self.meta_lbl.setText("")
+        else:
+            self.title_lbl.setText(task["name"] or "Untitled")
+            # Priority token
+            tok = priority_to_token(task.get("priority"))
+            tok_label = f"  {tok[1]}  " if tok else ""
+            meta = f"{task.get('group_name','')}  ·  due {task.get('due_date') or '—'}{tok_label}  ·  {task.get('status','')}"
+            self.meta_lbl.setText(meta.strip())
+
+        self.title_lbl.setStyleSheet(
+            f"color: {t['text']}; font-family: {serif}; font-size: 44px; "
+            f"font-weight: 700; border: none; padding: 0 20px;"
+        )
+        self.meta_lbl.setStyleSheet(
+            f"color: {t['text_dim']}; font-size: 13px; letter-spacing: 0.05em; border: none;"
+        )
+
+        # Buttons
+        btn_base = (
+            f"QPushButton {{ background: {t['section_bg']}; color: {t['text']}; "
+            f"border: 1px solid {t['border']}; border-radius: 10px; padding: 10px 18px; "
+            f"font-size: 13px; font-weight: 600; }}"
+            f"QPushButton:hover {{ background: {t['card_bg']}; border-color: {t['accent']}; }}"
+        )
+        self.pause_btn.setStyleSheet(btn_base)
+        self.next_btn.setStyleSheet(btn_base)
+        self.done_btn.setStyleSheet(
+            btn_base.replace(t['section_bg'], "#00c875").replace(t['text'], "white")
+            .replace(f"border: 1px solid {t['border']}", "border: 1px solid #00c875")
+        )
+        self.stuck_btn.setStyleSheet(
+            btn_base.replace(t['section_bg'], "#e2445c").replace(t['text'], "white")
+            .replace(f"border: 1px solid {t['border']}", "border: 1px solid #e2445c")
+        )
+
+        # Queue
+        self.queue_label.setStyleSheet(
+            f"color: {t['text_dim']}; font-size: 10px; font-weight: 700; letter-spacing: 0.25em;"
+        )
+        self._render_queue()
+
+        # Timer label + pause state
+        self._update_timer_label()
+        self.pause_indicator.setText("⏸  PAUSED" if self.paused else "")
+
+    def _render_queue(self):
+        # Clear existing
+        while self.queue_row.count():
+            item = self.queue_row.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        t = self.theme
+        candidates = self._candidates(limit=10)
+        # Skip the current task
+        candidates = [c for c in candidates if c["id"] != self.task_id][:8]
+
+        self.queue_row.addStretch()
+        for c in candidates:
+            status = c.get("status", "Not Started")
+            color = STATUS_COLORS.get(status, "#999")
+            sym = {"Not Started": "○", "Working on it": "▶", "Waiting for review": "◐",
+                   "On Hold": "⏸", "Stuck": "✕", "Done": "✓"}.get(status, "○")
+            btn = QPushButton(f"{sym}  {c['name'][:24]}")
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setStyleSheet(
+                f"QPushButton {{ background: {t['card_bg']}; color: {t['text']}; "
+                f"border: 1px solid {t['border']}; border-left: 3px solid {color}; "
+                f"border-radius: 6px; padding: 6px 10px; font-size: 11px; }}"
+                f"QPushButton:hover {{ border-color: {t['accent']}; }}"
+            )
+            tid = c["id"]
+            btn.clicked.connect(lambda _=False, _tid=tid: self._switch_task(_tid))
+            self.queue_row.addWidget(btn)
+        self.queue_row.addStretch()
+
+    def _switch_task(self, task_id):
+        self.task_id = int(task_id)
+        self.remaining_sec = self.SESSION_SECONDS
+        self.paused = False
+        self._render()
+
+    # ── Timer ──
+    def _on_tick(self):
+        if self.paused:
+            return
+        self.remaining_sec = max(0, self.remaining_sec - 1)
+        self._update_timer_label()
+        if self.remaining_sec <= 0:
+            self._timer.stop()
+            QMessageBox.information(self, "Focus", "Session complete — 50 minutes done. Take a break.")
+
+    def _update_timer_label(self):
+        m, s = divmod(self.remaining_sec, 60)
+        self.timer_lbl.setText(f"{m:02d}:{s:02d}")
+
+    def _toggle_pause(self):
+        self.paused = not self.paused
+        self.pause_indicator.setText("⏸  PAUSED" if self.paused else "")
+
+    # ── Actions ──
+    def _mark_status(self, status):
+        if self.task_id is None:
+            return
+        self.db.update_task(self.task_id, status=status)
+        self.status_changed.emit()
+        self._next_task()
+
+    def _next_task(self):
+        candidates = self._candidates()
+        # Pick first candidate that isn't the current one.
+        nxt = next((c for c in candidates if c["id"] != self.task_id), None)
+        if nxt is None:
+            QMessageBox.information(self, "Focus", "Queue complete — nothing else to focus on.")
+            self.close()
+            return
+        self._switch_task(nxt["id"])
+
+    # ── Keyboard ──
+    def keyPressEvent(self, ev):
+        key = ev.key()
+        mods = ev.modifiers()
+        if key == Qt.Key.Key_Escape:
+            self.close()
+            return
+        if key == Qt.Key.Key_Space:
+            self._toggle_pause()
+            return
+        if key in (Qt.Key.Key_Right, Qt.Key.Key_N):
+            self._next_task()
+            return
+        if key == Qt.Key.Key_S:
+            self._mark_status("Stuck")
+            return
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if mods & (Qt.KeyboardModifier.MetaModifier | Qt.KeyboardModifier.ControlModifier):
+                self._mark_status("Done")
+                return
+        super().keyPressEvent(ev)
 
 
 # ─── Notes Page ──────────────────────────────────────────────
@@ -5091,7 +6244,10 @@ class GroupTableWidget(QWidget):
             badge.clicked.connect(lambda _tid=tid: self._pick_status(_tid))
             self.table.setCellWidget(row, 2, badge)
 
-            pbadge = BadgeWidget(task["priority"], PRIORITY_COLORS.get(task["priority"], "#999"), min_w=90)
+            # Prism P0/P1/P2 token prefix on priority badge
+            _ptok = priority_to_token(task["priority"])
+            _ptxt = f"{_ptok[1]}  {task['priority']}" if _ptok else task["priority"]
+            pbadge = BadgeWidget(_ptxt, PRIORITY_COLORS.get(task["priority"], "#999"), min_w=110)
             pbadge.clicked.connect(lambda _tid=tid: self._pick_priority(_tid))
             self.table.setCellWidget(row, 3, pbadge)
 
@@ -5241,6 +6397,23 @@ class KanbanCard(QFrame):
 
         meta = QHBoxLayout()
         meta.setSpacing(4)
+        # P0/P1/P2 priority token (Prism)
+        ptok = priority_to_token(self.task.get("priority", ""))
+        if ptok is not None:
+            lvl, lbl = ptok
+            tok_color = {
+                "p0": "#e2445c",  # P0 — critical
+                "p1": "#fdab3d",  # P1 — high
+                "p2": "#0073ea",  # P2 — normal
+                "p3": "#a1a1a1",  # P3 — low
+            }.get(lvl, theme['text_dim'])
+            tok = QLabel(lbl)
+            tok.setStyleSheet(
+                f"color: white; background-color: {tok_color}; "
+                f"border-radius: 3px; padding: 0 5px; font-size: 9px; "
+                f"font-weight: 700; letter-spacing: 0.5px; border: none;"
+            )
+            meta.addWidget(tok)
         if self.task["due_date"]:
             due = QLabel(self.task['due_date'])
             due.setStyleSheet(f"color: {theme['text_dim']}; font-size: 10px; border: none;")
@@ -5371,8 +6544,15 @@ class FlowdeskApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.db = Database()
-        self.dark_mode = False
-        self.theme = LIGHT_THEME
+        # Skin system — restore persisted choice if any, default to 'prism'
+        self._settings = QSettings("Flowdesk", "Flowdesk")
+        saved_skin = self._settings.value("skin", "prism")
+        if saved_skin not in SKIN_THEMES:
+            saved_skin = "prism"
+        self.current_skin = saved_skin
+        self.theme = SKIN_THEMES[saved_skin]
+        # Legacy dark_mode kept in sync with the skin's isDark flag
+        self.dark_mode = bool(self.theme.get("_is_dark", False))
         self.search_text = ""
 
         # Sync
@@ -5469,13 +6649,53 @@ class FlowdeskApp(QMainWindow):
 
         tb.addWidget(QLabel("  "))
 
+        # Skin picker button (◎) — opens a menu with all 5 skins
+        self.skin_btn = QPushButton("\u25CE")
+        self.skin_btn.setFixedSize(28, 28)
+        self.skin_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.skin_btn.setToolTip("Change skin (⌘⇧T cycles)")
+        self.skin_btn.clicked.connect(self._open_skin_menu)
+        tb.addWidget(self.skin_btn)
+
         self.dark_btn = QPushButton("\u263d")
         self.dark_btn.setFixedSize(28, 28)
         self.dark_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.dark_btn.setToolTip("Toggle light/dark (Prism ↔ Mission)")
         self.dark_btn.clicked.connect(self._toggle_dark)
         tb.addWidget(self.dark_btn)
 
+        # Focus mode launcher (⌘⇧F)
+        self.focus_btn = QPushButton("\u29BF")  # ⦿ circled bullseye
+        self.focus_btn.setFixedSize(28, 28)
+        self.focus_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.focus_btn.setToolTip("Enter Focus mode (⌘⇧F)")
+        self.focus_btn.clicked.connect(self._toggle_focus_mode)
+        tb.addWidget(self.focus_btn)
+
         tb.addWidget(QLabel("  "))
+
+        # Global shortcut: Cmd/Ctrl+Shift+T cycles through skins
+        self._skin_shortcut = QShortcut(QKeySequence("Ctrl+Shift+T"), self)
+        self._skin_shortcut.activated.connect(self._cycle_skin)
+
+        # Global shortcut: Cmd/Ctrl+Shift+F opens Focus mode
+        self._focus_shortcut = QShortcut(QKeySequence("Ctrl+Shift+F"), self)
+        self._focus_shortcut.activated.connect(self._toggle_focus_mode)
+
+        # Vim-style g-then-X navigation (g h/f/b/t/c/n)
+        self._goto_pending = False
+        self._goto_timer = QTimer(self)
+        self._goto_timer.setSingleShot(True)
+        self._goto_timer.setInterval(900)  # 900ms window to press second key
+        self._goto_timer.timeout.connect(self._goto_timeout)
+        self._goto_map = {
+            Qt.Key.Key_H: (0, "Dashboard"),
+            Qt.Key.Key_F: (1, "Flows"),
+            Qt.Key.Key_B: (2, "Board"),
+            Qt.Key.Key_T: (3, "Timeline"),
+            Qt.Key.Key_C: (4, "Calendar"),
+            Qt.Key.Key_N: (5, "Notes"),
+        }
 
     def _setup_ui(self):
         central = QWidget()
@@ -5503,7 +6723,7 @@ class FlowdeskApp(QMainWindow):
         self.tabs = QTabWidget()
 
         # Dashboard view
-        self.dashboard_page = DashboardPage(self.db, self.theme)
+        self.dashboard_page = DashboardPage(self.db, self.theme, skin_name=self.current_skin)
         self.tabs.addTab(self.dashboard_page, "Dashboard")
 
         # Table view
@@ -5526,6 +6746,11 @@ class FlowdeskApp(QMainWindow):
         self.kanban_scroll.setWidget(self.kanban_content)
         self.tabs.addTab(self.kanban_scroll, "Kanban")
 
+        # Timeline view (14-day horizon)
+        self.timeline_view = TimelineView(self.db, self.theme, skin_name=self.current_skin)
+        self.timeline_view.task_clicked.connect(self._jump_to_kanban_for_task)
+        self.tabs.addTab(self.timeline_view, "Timeline")
+
         # Calendar view
         self.calendar_view = CalendarView(self.db, self.theme)
         self.tabs.addTab(self.calendar_view, "Calendar")
@@ -5547,8 +6772,38 @@ class FlowdeskApp(QMainWindow):
             self.calendar_view._refresh()
         if hasattr(self, 'dashboard_page'):
             self.dashboard_page.refresh()
+        if hasattr(self, 'timeline_view'):
+            self.timeline_view.refresh()
+        self._update_status_footer()
         # Don't refresh notes list while user is actively editing
         # (it would steal focus / disrupt typing)
+
+    # ── Timeline → Kanban jump ──
+    def _jump_to_kanban_for_task(self, task_id):
+        """Switch to Kanban tab when a Timeline pill is clicked."""
+        try:
+            idx = self.tabs.indexOf(self.kanban_scroll) if hasattr(self, 'kanban_scroll') else -1
+            if idx >= 0:
+                self.tabs.setCurrentIndex(idx)
+        except Exception:
+            pass
+
+    # ── Status footer (Iter 4 polish) ──
+    def _update_status_footer(self):
+        """Refresh the status bar string with flows + tasks + sync state."""
+        try:
+            stats = self.db.get_stats()
+            groups = self.db.get_groups()
+            skin = getattr(self, 'current_skin', 'prism')
+            msg = (
+                f"● {stats['total']} tasks  ·  {len(groups)} flows  ·  "
+                f"{stats['by_status'].get('Working on it', 0)} working  ·  "
+                f"{stats['by_status'].get('Stuck', 0)} stuck  ·  "
+                f"skin: {skin}  ·  Flowdesk v2.4"
+            )
+            self.statusBar().showMessage(msg)
+        except Exception:
+            pass
 
     def _update_summary(self):
         stats = self.db.get_stats()
@@ -5636,10 +6891,127 @@ class FlowdeskApp(QMainWindow):
         self._refresh()
 
     def _toggle_dark(self):
-        self.dark_mode = not self.dark_mode
-        self.theme = DARK_THEME if self.dark_mode else LIGHT_THEME
+        """Legacy dark toggle — flips between the current skin's light/dark counterparts.
+        Prism↔Mission by default. Kept for backward compatibility with old keybindings."""
+        next_skin = "mission" if not self.theme.get("_is_dark") else "prism"
+        self.set_skin(next_skin)
+
+    def set_skin(self, name):
+        """Switch to a named skin. Persists the choice via QSettings."""
+        if name not in SKIN_THEMES:
+            return
+        self.current_skin = name
+        self.theme = SKIN_THEMES[name]
+        self.dark_mode = bool(self.theme.get("_is_dark", False))
+        if hasattr(self, "_settings"):
+            self._settings.setValue("skin", name)
         self._apply_theme()
         self._refresh()
+
+    def _cycle_skin(self):
+        """Cycle to next skin in SKIN_ORDER. Triggered by Cmd/Ctrl+Shift+T."""
+        cur = getattr(self, "current_skin", "prism")
+        try:
+            i = SKIN_ORDER.index(cur)
+        except ValueError:
+            i = 0
+        self.set_skin(SKIN_ORDER[(i + 1) % len(SKIN_ORDER)])
+
+    def keyPressEvent(self, ev):
+        """Two-stroke vim nav: press 'g' then h/f/b/t/c/n to jump tabs.
+
+        Skipped when focus is on a text-input widget so it doesn't swallow typing.
+        """
+        fw = QApplication.focusWidget()
+        if fw is not None and isinstance(fw, (QLineEdit, QTextEdit)):
+            super().keyPressEvent(ev)
+            return
+
+        if self._goto_pending:
+            dst = self._goto_map.get(ev.key())
+            self._goto_pending = False
+            self._goto_timer.stop()
+            if dst is not None:
+                idx, label = dst
+                if 0 <= idx < self.tabs.count():
+                    self.tabs.setCurrentIndex(idx)
+                    self.statusBar().showMessage(f"→ {label}", 1200)
+                ev.accept()
+                return
+            # Fall through if second key didn't match
+        if ev.key() == Qt.Key.Key_G and not (ev.modifiers() & (
+            Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.MetaModifier
+            | Qt.KeyboardModifier.AltModifier)):
+            self._goto_pending = True
+            self._goto_timer.start()
+            self.statusBar().showMessage("g… (h/f/b/t/c/n)", 900)
+            ev.accept()
+            return
+        super().keyPressEvent(ev)
+
+    def _goto_timeout(self):
+        self._goto_pending = False
+        self.statusBar().clearMessage()
+
+    def _toggle_focus_mode(self):
+        """Open Focus mode overlay, or close it if already open. ⌘⇧F."""
+        ov = getattr(self, "_focus_overlay", None)
+        if ov is None:
+            ov = FocusOverlay(self.db, self.theme, parent=self, skin_name=self.current_skin)
+            ov.status_changed.connect(self._refresh)
+            self._focus_overlay = ov
+        if ov.isVisible():
+            ov.close()
+            return
+        ov.set_theme(self.theme, skin_name=self.current_skin)
+        ov.enter()
+
+    def _open_skin_menu(self):
+        """Popup menu with all 5 skins, showing a color swatch + tagline for each."""
+        from PyQt6.QtWidgets import QMenu, QWidgetAction, QLabel, QHBoxLayout, QWidget
+        menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {self.theme['card_bg']};
+                color: {self.theme['text']};
+                border: 1px solid {self.theme['border']};
+                border-radius: 8px;
+                padding: 6px;
+            }}
+            QMenu::item {{ padding: 6px 14px 6px 10px; border-radius: 6px; }}
+            QMenu::item:selected {{ background-color: {self.theme['section_bg']}; }}
+        """)
+        for sid in SKIN_ORDER:
+            label, tagline, swatch = SKIN_LABELS[sid]
+            row = QWidget()
+            lay = QHBoxLayout(row)
+            lay.setContentsMargins(10, 4, 14, 4)
+            lay.setSpacing(10)
+            dot = QLabel()
+            dot.setFixedSize(14, 14)
+            dot.setStyleSheet(f"background-color: {swatch}; border-radius: 7px;")
+            check = "● " if sid == self.current_skin else "   "
+            name_lbl = QLabel(f"{check}{label}")
+            name_lbl.setStyleSheet(f"color: {self.theme['text']}; font-size: 12px; font-weight: {'700' if sid == self.current_skin else '500'};")
+            tag_lbl = QLabel(tagline)
+            tag_lbl.setStyleSheet(f"color: {self.theme['text_dim']}; font-size: 10.5px;")
+            lay.addWidget(dot)
+            lay.addWidget(name_lbl)
+            lay.addStretch(1)
+            lay.addWidget(tag_lbl)
+            act = QWidgetAction(menu)
+            act.setDefaultWidget(row)
+            act.triggered.connect(lambda _checked=False, s=sid: self.set_skin(s))
+            # QWidgetAction swallows clicks on the inner widget; route them manually:
+            def _mouse_factory(sid_):
+                def _h(ev, _sid=sid_):
+                    self.set_skin(_sid)
+                    menu.close()
+                return _h
+            row.mousePressEvent = _mouse_factory(sid)
+            menu.addAction(act)
+        btn = self.skin_btn
+        menu.exec(btn.mapToGlobal(btn.rect().bottomRight()) - QPoint(menu.sizeHint().width(), 0))
 
     def _apply_theme(self):
         t = self.theme
@@ -5676,6 +7048,13 @@ class FlowdeskApp(QMainWindow):
                 QPushButton {{ border: none; font-size: 16px; color: {t['toolbar_btn_color']}; background: transparent; border-radius: 6px; }}
                 QPushButton:hover {{ background-color: {t['toolbar_btn_hover']}; }}
             """)
+        # Skin picker button
+        if hasattr(self, 'skin_btn'):
+            # Use current accent color for the glyph to hint at active skin
+            self.skin_btn.setStyleSheet(f"""
+                QPushButton {{ border: none; font-size: 16px; color: {t['accent']}; background: transparent; border-radius: 6px; font-weight: 700; }}
+                QPushButton:hover {{ background-color: {t['toolbar_btn_hover']}; }}
+            """)
         # Sync indicator
         if hasattr(self, 'sync_indicator'):
             self.sync_indicator.set_theme(t)
@@ -5684,7 +7063,9 @@ class FlowdeskApp(QMainWindow):
         if hasattr(self, 'notes_page'):
             self.notes_page.set_theme(t)
         if hasattr(self, 'dashboard_page'):
-            self.dashboard_page.set_theme(t)
+            self.dashboard_page.set_theme(t, skin_name=getattr(self, 'current_skin', 'prism'))
+        if hasattr(self, 'timeline_view'):
+            self.timeline_view.set_theme(t, skin_name=getattr(self, 'current_skin', 'prism'))
 
     def _expand_all(self):
         for g in self.db.get_groups():

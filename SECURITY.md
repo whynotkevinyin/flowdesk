@@ -48,6 +48,12 @@
 - 無法撤銷單一裝置
 - 無法區分「讀」跟「寫」權限
 
+**R7. 登入後不會自動鎖定** ✅ **已修（2026-04-19）**
+- 之前登入後，只要瀏覽器分頁不關就永遠有效
+- 不小心把筆電留在會議室、或被同事借走 → 別人就能看到你的所有資料
+- ✅ 現在加了 idle auto-lock：30 分鐘沒動作就自動登出
+- 登出後下次打開會看到 `🕐 因閒置超過 30 分鐘已自動登出` 的提示
+
 ---
 
 ## 2. 這次做了什麼（web 端，不需改 Code.gs）
@@ -72,7 +78,17 @@
 
 ### (d) 測試覆蓋
 - `qa_security.py` 19 個測試全過
-- 包含：事件記錄正確、密碼不存在 DOM、速率限制鎖定、modal UI、Export / Clear
+- `qa_p0_post_migration.py` 19 個測試全過
+- `qa_idle_lock.py` 30 個測試全過
+- 包含：事件記錄正確、密碼不存在 DOM、速率限制鎖定、modal UI、Export / Clear、POST 遷移、閒置自動登出
+
+### (e) Idle auto-lock（2026-04-19 新增）
+- `IDLE_LOCK_MS = 30 * 60 * 1000`（30 分鐘）
+- 監聽 `mousemove / keydown / scroll / click / touchstart` 更新 `lastActivityAt`
+- 每 30 秒檢查一次；超過 30 分鐘沒動作 → 自動 `doLogout(true)`
+- 寫入 `idle_lock` security event（🕐 amber icon）
+- `localStorage.flowdesk_last_lock_reason = 'idle'`，下次進登入頁會顯示琥珀色橫幅
+- 登出（手動或 idle）都會清掉 timer，避免雙重觸發
 
 ---
 

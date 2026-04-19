@@ -3844,6 +3844,7 @@
                 <span class="flow">Flow</span><span class="desk">desk</span>
             </div>
             <div class="login-subtitle">Enter your password to access your data</div>
+            <div id="loginNotice" style="display:none; margin:0 0 12px; padding:10px 14px; border-radius:8px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; font-size:13px; line-height:1.4;"></div>
             <input type="password" id="loginKeyInput" class="login-input" placeholder="Password or API Key" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="current-password">
             <div class="login-remember">
                 <input type="checkbox" id="loginRemember" checked>
@@ -4127,6 +4128,51 @@
             try { localStorage.removeItem('flowdesk_rate_limit'); } catch (e) {}
         }
 
+        // ── Idle auto-lock ──
+        // After IDLE_LOCK_MS of no user activity, auto-logout. Matches common
+        // banking-app behaviour and protects against an unattended laptop.
+        const IDLE_LOCK_MS = 30 * 60 * 1000;          // 30 minutes
+        const IDLE_CHECK_INTERVAL_MS = 30 * 1000;     // check every 30s
+        const IDLE_EVENTS = ['mousemove', 'keydown', 'scroll', 'click', 'touchstart'];
+        let lastActivityAt = Date.now();
+        let idleCheckTimer = null;
+        let idleListenersAttached = false;
+        function recordActivity() { lastActivityAt = Date.now(); }
+        function startIdleTracker() {
+            lastActivityAt = Date.now();
+            if (!idleListenersAttached) {
+                IDLE_EVENTS.forEach(evt => document.addEventListener(evt, recordActivity, { passive: true, capture: true }));
+                idleListenersAttached = true;
+            }
+            if (idleCheckTimer) clearInterval(idleCheckTimer);
+            idleCheckTimer = setInterval(() => {
+                // Only fire when actually authenticated
+                if (!FLOWDESK_API_KEY) return;
+                if (Date.now() - lastActivityAt > IDLE_LOCK_MS) {
+                    try { localStorage.setItem('flowdesk_last_lock_reason', 'idle'); } catch (e) {}
+                    logSecurityEvent('idle_lock', `Auto-locked after ${Math.round(IDLE_LOCK_MS/60000)} min idle`);
+                    doLogout(true);  // true = triggered by idle lock
+                }
+            }, IDLE_CHECK_INTERVAL_MS);
+        }
+        function stopIdleTracker() {
+            if (idleCheckTimer) { clearInterval(idleCheckTimer); idleCheckTimer = null; }
+            // Leave listeners attached — they're cheap and we may re-login.
+        }
+        function showLoginNoticeFromLastLock() {
+            try {
+                const reason = localStorage.getItem('flowdesk_last_lock_reason');
+                if (reason === 'idle') {
+                    const banner = document.getElementById('loginNotice');
+                    if (banner) {
+                        banner.textContent = `🕐 因閒置超過 ${Math.round(IDLE_LOCK_MS/60000)} 分鐘已自動登出。請重新輸入密碼。`;
+                        banner.style.display = 'block';
+                    }
+                    localStorage.removeItem('flowdesk_last_lock_reason');
+                }
+            } catch (e) {}
+        }
+
         // ── Security log viewer ──
         const SECURITY_TYPE_LABELS = {
             login_ok:     { label: 'Signed in',        color: '#16a34a', emoji: '✓' },
@@ -4134,7 +4180,8 @@
             login_error:  { label: 'Connection error', color: '#d97706', emoji: '!' },
             logout:       { label: 'Signed out',       color: '#6b7280', emoji: '⇲' },
             autologin_ok: { label: 'Auto sign-in',     color: '#2563eb', emoji: '↻' },
-            rate_limit:   { label: 'Rate limited',     color: '#b91c1c', emoji: '⛔' }
+            rate_limit:   { label: 'Rate limited',     color: '#b91c1c', emoji: '⛔' },
+            idle_lock:    { label: 'Idle auto-lock',   color: '#d97706', emoji: '🕐' }
         };
         function fmtSecurityTime(t) {
             const d = new Date(t);
@@ -4256,6 +4303,7 @@
                 input.value = '';
                 clearRateLimitOnSuccess();
                 logSecurityEvent('login_ok', 'Password unlock');
+                startIdleTracker();
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('mainApp').style.display = '';
                 document.getElementById('logoutArea').style.display = '';
@@ -4276,15 +4324,19 @@
             }
         }
 
-        function doLogout() {
+        function doLogout(fromIdleLock) {
+            stopIdleTracker();
             FLOWDESK_API_KEY = '';
             localStorage.removeItem('flowdesk_api_key');
-            logSecurityEvent('logout', 'Manual logout');
+            // Only log a manual logout if this wasn't already logged as idle_lock
+            if (!fromIdleLock) logSecurityEvent('logout', 'Manual logout');
             document.getElementById('mainApp').style.display = 'none';
             document.getElementById('logoutArea').style.display = 'none';
             document.getElementById('loginScreen').style.display = '';
             document.getElementById('loginKeyInput').value = '';
             document.getElementById('loginError').style.display = 'none';
+            // If triggered by idle lock, surface the banner immediately
+            if (fromIdleLock) showLoginNoticeFromLastLock();
         }
 
         function tryAutoLogin() {
@@ -4295,6 +4347,7 @@
                 document.getElementById('mainApp').style.display = '';
                 document.getElementById('logoutArea').style.display = '';
                 logSecurityEvent('autologin_ok', 'Auto-login from saved key');
+                startIdleTracker();
                 return true;
             }
             return false;
@@ -5406,8 +5459,10 @@
             // Try auto-login with saved key
             if (tryAutoLogin()) {
                 initApp();
+            } else {
+                // Login screen is showing — surface any "you were auto-locked" notice
+                showLoginNoticeFromLastLock();
             }
-            // Otherwise show login screen (default)
         });
 
         // ── Vim-style g-then-X navigation (Mission variant) ──

@@ -5076,7 +5076,7 @@
             html += groups.map(g => {
                 const count = (g.tasks || []).length;
                 const safe = (g.title || '').replace(/</g, '&lt;');
-                const active = (selectedFlowId === g.id) ? ' active' : '';
+                const active = (String(selectedFlowId) === String(g.id)) ? ' active' : '';
                 return `<div class="prism-flow-row${active}" data-gid="${g.id}">
                     <span class="prism-flow-dot" style="background:${g.color || '#999'}"></span>
                     <span class="prism-flow-name">${safe}</span>
@@ -5941,7 +5941,7 @@
             // Filter breadcrumb (Prism only): if selectedFlowId is set, show a dismissible chip
             const isPrism = document.body.classList.contains('prism-theme');
             const activeGroup = selectedFlowId
-                ? appData.groups.find(g => g.id === selectedFlowId)
+                ? appData.groups.find(g => String(g.id) === String(selectedFlowId))
                 : null;
 
             // Prism editorial masthead + KPI strip (Iter 7) — honors selectedFlowId
@@ -6505,7 +6505,7 @@
             rowsWrap.className = 'pr-timeline-rows';
             // Honor sidebar flow filter
             const _allGroups = (appData && appData.groups) ? appData.groups : [];
-            const _activeGroup = selectedFlowId ? _allGroups.find(g => g.id === selectedFlowId) : null;
+            const _activeGroup = selectedFlowId ? _allGroups.find(g => String(g.id) === String(selectedFlowId)) : null;
             if (selectedFlowId && !_activeGroup) selectedFlowId = null;
             const groups = _activeGroup ? [_activeGroup] : _allGroups;
             if (groups.length === 0) {
@@ -6601,7 +6601,7 @@
             const statuses = ['Not Started', 'Working on it', 'Waiting for review', 'On Hold', 'Stuck', 'Done'];
             // Honor sidebar flow filter
             const _allGroups = appData.groups || [];
-            const _activeGroup = selectedFlowId ? _allGroups.find(g => g.id === selectedFlowId) : null;
+            const _activeGroup = selectedFlowId ? _allGroups.find(g => String(g.id) === String(selectedFlowId)) : null;
             if (selectedFlowId && !_activeGroup) selectedFlowId = null;
             const _kanbanGroups = _activeGroup ? [_activeGroup] : _allGroups;
             const allTasks = _kanbanGroups.flatMap(g => (g.tasks || []).map(t => ({ ...t, groupId: g.id })));
@@ -7483,7 +7483,7 @@
         // ── Prism Bento dashboard ──
         function renderPrismDashboard(container) {
             const allGroups = (appData && appData.groups) ? appData.groups : [];
-            const activeGroup = selectedFlowId ? allGroups.find(g => g.id === selectedFlowId) : null;
+            const activeGroup = selectedFlowId ? allGroups.find(g => String(g.id) === String(selectedFlowId)) : null;
             // Stale selectedFlowId → quietly clear
             if (selectedFlowId && !activeGroup) selectedFlowId = null;
             const groups = activeGroup ? [activeGroup] : allGroups;

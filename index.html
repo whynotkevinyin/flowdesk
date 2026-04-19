@@ -4044,8 +4044,26 @@
         let FLOWDESK_API_KEY = '';
 
         // ── Auth functions ──
+        // getAuthUrl is kept as a fallback path; prefer apiCall() which sends the
+        // key in a POST body so it doesn't leak into GAS logs / Network tab / referrer.
         function getAuthUrl(action) {
             return API_URL + '?action=' + action + '&key=' + encodeURIComponent(FLOWDESK_API_KEY);
+        }
+
+        // apiCall — key stays in POST body, never in URL.
+        // Uses text/plain content-type so the browser skips the CORS preflight
+        // (Apps Script would reject the OPTIONS request otherwise).
+        // `keyOverride` lets doLogin send a candidate key that hasn't been stored yet.
+        async function apiCall(action, extraBody, keyOverride) {
+            const key = (keyOverride !== undefined ? keyOverride : FLOWDESK_API_KEY) || '';
+            const body = Object.assign({ action: action, key: key }, extraBody || {});
+            const resp = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(body),
+                redirect: 'follow'
+            });
+            return resp.json();
         }
 
         // ── Security log — login success/failure audit trail ──
@@ -4216,9 +4234,8 @@
             errEl.style.display = 'none'; input.classList.remove('error');
 
             try {
-                // Test the key by calling getTasks
-                const resp = await fetch(API_URL + '?action=getTasks&key=' + encodeURIComponent(key));
-                const data = await resp.json();
+                // Test the key by calling getTasks (POST — key stays out of URL)
+                const data = await apiCall('getTasks', {}, key);
                 if (data.error && data.code === 401) {
                     input.classList.add('error');
                     errEl.textContent = '密碼錯誤，請重試。';
@@ -5555,10 +5572,10 @@
                     await pushSync(isFull);
                 }
 
-                // Quick uses getTasksLight (no note content), Full uses getTasks
+                // Quick uses getTasksLight (no note content), Full uses getTasks.
+                // POST with key in body — avoids ?key=XXX leak in GAS logs / history.
                 const endpoint = isFull ? 'getTasks' : 'getTasksLight';
-                const response = await fetch(getAuthUrl(endpoint));
-                const data = await response.json();
+                const data = await apiCall(endpoint);
                 if (data.error && data.code === 401) { doLogout(); return; }
 
                 if (data.groups) {

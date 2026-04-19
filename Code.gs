@@ -1,10 +1,13 @@
 // ============================================================
-// Code.gs — Flowdesk Backend API (v12 — content-hash short-circuit for notes)
+// Code.gs — Flowdesk Backend API (v16 — key-in-body POST, no-query-key)
 // ============================================================
 // Notes content → Google Drive files (no 50K limit)
 // Events ↔ Google Calendar (bidirectional sync, delete propagation)
 // Groups/Tasks/Members: anti-destruction guard — empty payloads NEVER wipe cloud
 // v12: Notes sheet stores contentHash (col 13) so unchanged content skips Drive writes
+// v16: doPost handles all read actions (getTasks, getTasksLight, getNoteContent, init)
+//      so the web client can send the API key in the POST body instead of URL query.
+//      doGet kept as-is for backwards compatibility with older desktop / cached clients.
 // ============================================================
 
 // ⚠️ CHANGE THESE to your own secrets!
@@ -24,7 +27,7 @@ function checkAuth(e) {
 
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
-  if (action === 'ping') return json({ ok: true, version: 15 });
+  if (action === 'ping') return json({ ok: true, version: 16 });
   if (!checkAuth(e)) return json({ error: 'Unauthorized', code: 401 });
   if (action === 'init') return json(initSheet());
   if (action === 'getTasks') return json(getAllData());
@@ -44,17 +47,36 @@ function doGet(e) {
   return json({ error: 'Unknown action: ' + action });
 }
 
+// v16: doPost now handles every action doGet handles — so the web client can keep
+// the API key out of the URL query string (and therefore out of GAS server logs,
+// browser history, and the Network tab). Body format:
+//   { action: 'getTasks' | 'getTasksLight' | 'getNoteContent' | 'init' | 'ping' | 'syncAll',
+//     key: '<API_KEY or PIN>',
+//     noteId: '<only for getNoteContent>',
+//     ... <syncAll payload fields> }
 function doPost(e) {
   try {
-    const paramKey = (e && e.parameter && e.parameter.key) || '';
-    const body = JSON.parse(e.postData.contents);
+    let body = {};
+    try { body = JSON.parse(e.postData.contents); } catch (err) { body = {}; }
+    const paramKey = (e && e.parameter && e.parameter.key) || '';  // legacy fallback
     const bodyKey = body.key || '';
-    if (paramKey !== API_KEY && paramKey !== PIN && bodyKey !== API_KEY && bodyKey !== PIN) {
-      return json({ error: 'Unauthorized', code: 401 });
+    const action = body.action || (e && e.parameter && e.parameter.action) || '';
+
+    // ping is the only action that does not require auth
+    if (action === 'ping') return json({ ok: true, version: 16 });
+
+    const authed = (paramKey === API_KEY || paramKey === PIN || bodyKey === API_KEY || bodyKey === PIN);
+    if (!authed) return json({ error: 'Unauthorized', code: 401 });
+
+    if (action === 'init') return json(initSheet());
+    if (action === 'getTasks') return json(getAllData());
+    if (action === 'getTasksLight') return json(getAllDataLight());
+    if (action === 'getNoteContent') {
+      const noteId = body.noteId || '';
+      return json(getNoteContentById(noteId));
     }
-    const action = body.action;
     if (action === 'syncAll') return json(syncAll(body));
-    return json({ error: 'Unknown action' });
+    return json({ error: 'Unknown action: ' + action });
   } catch (err) {
     return json({ error: err.message });
   }

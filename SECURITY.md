@@ -15,12 +15,13 @@
 
 ### 🔴 高風險
 
-**R1. 密碼以明文出現在網址 query string**
-`fetch(API_URL + '?action=getTasks&key=' + encodeURIComponent(key))`
-- Apps Script 後端會把整個 URL（含 `key`）寫進伺服器 log
-- 瀏覽器的 `history`、`referrer header`、`performance API` 都能拿到
-- DevTools → Network tab 會把這個請求整段 URL 顯示出來
-- 這是目前**最該修**的一個問題
+**R1. 密碼以明文出現在網址 query string** ✅ **已修（2026-04-19）**
+- 先前 `fetch(API_URL + '?action=getTasks&key=' + encodeURIComponent(key))`
+- 現在全部改走 POST + `Content-Type: text/plain;charset=utf-8`（避免 CORS preflight）
+- 新的 `apiCall()` helper 把 `action` 與 `key` 放在 JSON body 裡
+- Code.gs v16 的 `doPost()` 現在也接手所有讀取動作（`getTasks` / `getTasksLight` / `getNoteContent` / `init` / `ping`）
+- `doGet()` 保留向下相容，舊的 desktop client 仍可用
+- 結果：Network tab / browser history / referrer header / GAS log 都**不再**有密碼
 
 **R2. 密碼以明文存在 `localStorage.flowdesk_api_key`**
 - 任何能在 `file://` 或未來部署網域執行 JS 的人（包含惡意 extension）都能讀到
@@ -79,31 +80,43 @@
 
 **這些需要同時改 Web（index.html）和 Server（Code.gs）。**我沒有直接碰 Code.gs，因為那是 Kevin 部署的、改錯會讓所有人鎖在外面。
 
-### P0 — 金鑰不要出現在 URL
+### ~~P0 — 金鑰不要出現在 URL~~ ✅ 完成 2026-04-19
 
-**Web 端改動：**
-```js
-// 把 key 放在 POST body，不要放在 URL
-fetch(API_URL, {
-  method: 'POST',
-  headers: { 'Content-Type': 'text/plain;charset=utf-8' },  // 避免 CORS preflight
-  body: JSON.stringify({ action: 'getTasks', key: FLOWDESK_API_KEY })
-});
-```
+**這輪做完了。**
 
-**Code.gs 改動：**
+**Web 端（index.html）：**
 ```js
-function doPost(e) {
-  const body = JSON.parse(e.postData.contents);
-  if (body.key !== PROPS.getProperty('API_KEY')) {
-    return ContentService.createTextOutput(JSON.stringify({ error: 'Unauthorized', code: 401 }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-  // ... 照 body.action 分流
+// 新的 apiCall helper — 取代所有 fetch(API_URL + '?key=...')
+async function apiCall(action, extraBody, keyOverride) {
+  const key = (keyOverride !== undefined ? keyOverride : FLOWDESK_API_KEY) || '';
+  const body = Object.assign({ action, key }, extraBody || {});
+  const resp = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },  // skip CORS preflight
+    body: JSON.stringify(body),
+    redirect: 'follow'
+  });
+  return resp.json();
 }
 ```
 
-這會把密碼從 GAS 後端 log、瀏覽器 history、referrer header 裡整個拿掉。
+**Code.gs v16：**
+- `doPost(e)` 現在處理所有動作（ping / init / getTasks / getTasksLight / getNoteContent / syncAll）
+- 認證邏輯：`paramKey === API_KEY || bodyKey === API_KEY` — 同時接受 URL query 跟 body，**但 Web 不再送 URL query**
+- `doGet(e)` 保持原樣，舊 desktop client 仍可用
+
+**部署步驟（Kevin 需要做的）：**
+1. 打開 Google Apps Script 專案
+2. 貼上新版 `Code.gs`
+3. **Deploy → Manage deployments → Edit（鉛筆）→ Version: New version → Deploy**
+4. 重要：不用換 URL（Apps Script web app URL 不變，因為是 update 既有 deployment）
+5. Web 端不用動，因為已經 push 到 origin/main 了；重新載入頁面就會用新版本
+
+**驗證方式：**
+- 點 🛡️ Security 按鈕，嘗試登入
+- 打開 DevTools Network tab → 點那個 POST 請求
+- Request URL 應該只有 `.../exec`，**沒有** `?key=xxx`
+- Request Payload（body）裡才有 `{"action":"getTasks","key":"..."}`
 
 ### P1 — 客戶端 hash + 時戳 nonce
 

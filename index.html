@@ -2515,6 +2515,162 @@
         }
         .prism-hero-filter .pr-bc-x:hover { background: var(--pr-accent); color: white; }
 
+        /* ── Command palette (search + Jump to unified) ── */
+        .prism-palette-backdrop {
+            position: fixed; inset: 0;
+            background: rgba(12, 13, 20, 0.42);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            z-index: 200;
+            display: none;
+            animation: viewFadeIn 0.14s ease;
+        }
+        .prism-palette-backdrop.open { display: block; }
+        .prism-palette {
+            position: fixed;
+            top: 12vh; left: 50%; transform: translateX(-50%);
+            width: min(620px, 92vw);
+            max-height: 72vh;
+            background: var(--pr-surface);
+            border: 1px solid var(--pr-line);
+            border-radius: 14px;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.12);
+            overflow: hidden;
+            display: flex; flex-direction: column;
+            animation: paletteIn 0.16s ease;
+        }
+        @keyframes paletteIn {
+            from { opacity: 0; transform: translate(-50%, -8px) scale(0.98); }
+            to   { opacity: 1; transform: translate(-50%, 0)     scale(1); }
+        }
+        .prism-palette-input-wrap {
+            display: flex; align-items: center; gap: 10px;
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--pr-line);
+        }
+        .prism-palette-icon {
+            color: var(--pr-muted); flex-shrink: 0;
+            display: inline-flex; align-items: center;
+        }
+        .prism-palette-input {
+            flex: 1; border: none; outline: none; background: transparent;
+            color: var(--pr-ink); font-size: 16px; font-weight: 500;
+            font-family: inherit;
+        }
+        .prism-palette-input::placeholder { color: var(--pr-muted); }
+        .prism-palette-esc {
+            font-size: 10.5px; color: var(--pr-muted);
+            padding: 2px 6px; border-radius: 4px;
+            background: var(--pr-surface-2);
+            border: 1px solid var(--pr-line);
+            letter-spacing: 0.05em;
+        }
+        .prism-palette-body {
+            flex: 1; overflow-y: auto;
+            padding: 6px 0;
+        }
+        .prism-palette-empty {
+            padding: 40px 20px; text-align: center;
+            color: var(--pr-muted); font-size: 13px;
+        }
+        .prism-palette-empty-hint {
+            display: block; margin-top: 6px;
+            font-size: 11.5px; color: var(--pr-muted);
+        }
+        .prism-palette-section {
+            padding: 8px 0 4px;
+        }
+        .prism-palette-section-label {
+            padding: 6px 18px 6px;
+            font-size: 10.5px; font-weight: 600;
+            letter-spacing: 0.14em; text-transform: uppercase;
+            color: var(--pr-muted);
+        }
+        .prism-palette-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 9px 18px;
+            cursor: pointer;
+            border-left: 2px solid transparent;
+            transition: background 0.08s, border-color 0.08s;
+        }
+        .prism-palette-item:hover,
+        .prism-palette-item.active {
+            background: var(--pr-accent-soft);
+            border-left-color: var(--pr-accent);
+        }
+        .prism-palette-item-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .prism-palette-item-kind {
+            width: 22px; height: 22px; border-radius: 6px;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 600;
+            color: var(--pr-muted);
+            background: var(--pr-surface-2);
+            border: 1px solid var(--pr-line);
+            flex-shrink: 0;
+        }
+        .prism-palette-item-body {
+            flex: 1; min-width: 0;
+            display: flex; flex-direction: column; gap: 2px;
+        }
+        .prism-palette-item-title {
+            font-size: 13.5px; color: var(--pr-ink);
+            font-weight: 500;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .prism-palette-item-title mark {
+            background: rgba(255, 225, 100, 0.35);
+            color: inherit;
+            padding: 0 1px;
+            border-radius: 2px;
+        }
+        body.prism-theme.skin-ember .prism-palette-item-title mark,
+        body.prism-theme.skin-mission .prism-palette-item-title mark {
+            background: rgba(255, 225, 100, 0.28);
+        }
+        .prism-palette-item-sub {
+            font-size: 11.5px; color: var(--pr-muted);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .prism-palette-item-shortcut {
+            font-size: 10.5px; color: var(--pr-muted);
+            padding: 2px 6px; border-radius: 4px;
+            background: var(--pr-surface-2);
+            border: 1px solid var(--pr-line);
+            opacity: 0; transition: opacity 0.1s;
+        }
+        .prism-palette-item:hover .prism-palette-item-shortcut,
+        .prism-palette-item.active .prism-palette-item-shortcut { opacity: 1; }
+        .prism-palette-footer {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 18px;
+            border-top: 1px solid var(--pr-line);
+            font-size: 11px; color: var(--pr-muted);
+            background: var(--pr-surface-2);
+        }
+        .prism-palette-footer-keys { display: flex; gap: 12px; }
+        .prism-palette-footer kbd {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 18px; height: 18px; padding: 0 5px;
+            font-family: inherit; font-size: 10px;
+            color: var(--pr-ink);
+            background: var(--pr-surface);
+            border: 1px solid var(--pr-line);
+            border-radius: 4px;
+            margin-right: 4px;
+        }
+
+        /* Flash animation for palette → task row navigation */
+        @keyframes paletteFlash {
+            0%   { background-color: var(--pr-accent-soft); box-shadow: inset 3px 0 0 var(--pr-accent); }
+            100% { background-color: transparent; box-shadow: none; }
+        }
+        body.prism-theme .group-table tbody tr.palette-flash {
+            animation: paletteFlash 1.4s ease-out;
+        }
+
         .prism-user-card {
             margin-top: auto;
             background: var(--pr-surface);
@@ -3861,7 +4017,26 @@
 
     <!-- Logout button (visible when logged in) -->
     <div class="login-logout" id="logoutArea" style="display:none;">
+        <button onclick="openSecurityLog()" title="Security log · recent sign-in events" style="margin-right:4px;">🛡️ Security</button>
         <button onclick="doLogout()">🔒 Logout</button>
+    </div>
+
+    <!-- Security log modal (audit trail for login events) -->
+    <div id="securityLogOverlay" class="popup-overlay hidden" onclick="closeSecurityLog()" style="z-index:1499;"></div>
+    <div id="securityLogModal" class="popup hidden" style="z-index:1500; width:min(640px, 94vw); max-height:80vh; padding:0; display:none; flex-direction:column; overflow:hidden;">
+        <div style="padding:16px 20px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; font-size:16px; font-weight:600;">🛡️ Security log</h3>
+            <button onclick="closeSecurityLog()" style="background:none; border:none; font-size:22px; cursor:pointer; color:#6b7280; line-height:1; padding:0 4px;">×</button>
+        </div>
+        <div id="securityLogSummary" style="padding:12px 20px; border-bottom:1px solid #f3f4f6; font-size:13px; color:#6b7280; background:#fafafa;"></div>
+        <div id="securityLogBody" style="overflow:auto; flex:1; min-height:220px; max-height:50vh;"></div>
+        <div style="padding:12px 20px; border-top:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center; background:#fafafa;">
+            <span style="font-size:12px; color:#9ca3af;">Stored locally · no passwords logged</span>
+            <div style="display:flex; gap:8px;">
+                <button class="popup-btn" onclick="exportSecurityLog()">Export JSON</button>
+                <button class="popup-btn" onclick="clearSecurityLog()">Clear log</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -3873,12 +4048,169 @@
             return API_URL + '?action=' + action + '&key=' + encodeURIComponent(FLOWDESK_API_KEY);
         }
 
+        // ── Security log — login success/failure audit trail ──
+        // Stored separately from activity log so login events don't mix with task mutations.
+        // Ring buffer of the 200 most recent events. No sensitive data (no passwords, no hashes).
+        const SECURITY_LOG_MAX = 200;
+        let securityLog = [];
+        try {
+            const saved = localStorage.getItem('flowdesk_security_log');
+            if (saved) securityLog = JSON.parse(saved) || [];
+        } catch (e) { securityLog = []; }
+        function logSecurityEvent(type, detail) {
+            try {
+                const entry = {
+                    t: Date.now(),
+                    type: type || 'misc',  // 'login_ok', 'login_fail', 'login_error', 'logout', 'autologin_ok', 'rate_limit'
+                    detail: detail || '',
+                    ua: (navigator.userAgent || '').slice(0, 180),
+                    platform: navigator.platform || '',
+                    lang: navigator.language || ''
+                };
+                securityLog.unshift(entry);
+                if (securityLog.length > SECURITY_LOG_MAX) securityLog.length = SECURITY_LOG_MAX;
+                localStorage.setItem('flowdesk_security_log', JSON.stringify(securityLog));
+            } catch (e) { /* localStorage full / private mode */ }
+        }
+
+        // ── Client-side rate limiting (best-effort; a determined attacker can bypass
+        //    by wiping localStorage, but this stops casual brute-force attempts) ──
+        const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;  // 10 minutes
+        const RATE_LIMIT_MAX_FAILS = 5;
+        const RATE_LIMIT_LOCKOUT_MS = 5 * 60 * 1000;  // 5 minutes
+        function getRateLimitStatus() {
+            try {
+                const raw = localStorage.getItem('flowdesk_rate_limit');
+                if (!raw) return { blocked: false, remaining: 0 };
+                const data = JSON.parse(raw);
+                if (data.until && Date.now() < data.until) {
+                    return { blocked: true, remaining: Math.ceil((data.until - Date.now()) / 1000) };
+                }
+                // Prune old failures outside the window
+                const fails = (data.fails || []).filter(t => Date.now() - t < RATE_LIMIT_WINDOW_MS);
+                return { blocked: false, remaining: 0, recentFails: fails.length };
+            } catch (e) { return { blocked: false, remaining: 0 }; }
+        }
+        function recordLoginFailure() {
+            try {
+                const raw = localStorage.getItem('flowdesk_rate_limit');
+                let data = raw ? JSON.parse(raw) : { fails: [] };
+                const now = Date.now();
+                data.fails = (data.fails || []).filter(t => now - t < RATE_LIMIT_WINDOW_MS);
+                data.fails.push(now);
+                if (data.fails.length >= RATE_LIMIT_MAX_FAILS) {
+                    data.until = now + RATE_LIMIT_LOCKOUT_MS;
+                    logSecurityEvent('rate_limit', `${data.fails.length} failed attempts · locked out ${Math.round(RATE_LIMIT_LOCKOUT_MS/60000)} min`);
+                }
+                localStorage.setItem('flowdesk_rate_limit', JSON.stringify(data));
+            } catch (e) {}
+        }
+        function clearRateLimitOnSuccess() {
+            try { localStorage.removeItem('flowdesk_rate_limit'); } catch (e) {}
+        }
+
+        // ── Security log viewer ──
+        const SECURITY_TYPE_LABELS = {
+            login_ok:     { label: 'Signed in',        color: '#16a34a', emoji: '✓' },
+            login_fail:   { label: 'Wrong password',   color: '#dc2626', emoji: '✕' },
+            login_error:  { label: 'Connection error', color: '#d97706', emoji: '!' },
+            logout:       { label: 'Signed out',       color: '#6b7280', emoji: '⇲' },
+            autologin_ok: { label: 'Auto sign-in',     color: '#2563eb', emoji: '↻' },
+            rate_limit:   { label: 'Rate limited',     color: '#b91c1c', emoji: '⛔' }
+        };
+        function fmtSecurityTime(t) {
+            const d = new Date(t);
+            const now = new Date();
+            const sameDay = d.toDateString() === now.toDateString();
+            const yester = new Date(now); yester.setDate(yester.getDate() - 1);
+            const isYester = d.toDateString() === yester.toDateString();
+            const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            if (sameDay) return `Today · ${timeStr}`;
+            if (isYester) return `Yesterday · ${timeStr}`;
+            return `${d.toLocaleDateString()} · ${timeStr}`;
+        }
+        function renderSecurityLogHtml() {
+            if (!securityLog || securityLog.length === 0) {
+                return `<div style="padding:32px 20px; text-align:center; color:var(--pr-text-muted, #9ca3af); font-size:13px;">
+                    No sign-in events yet. Events are recorded here after you log in or out.
+                </div>`;
+            }
+            return securityLog.map(e => {
+                const meta = SECURITY_TYPE_LABELS[e.type] || { label: e.type, color: '#6b7280', emoji: '·' };
+                const detail = e.detail ? String(e.detail).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c])) : '';
+                const ua = (e.ua || '').replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+                return `<div style="padding:10px 18px; border-bottom:1px solid var(--pr-border, #f3f4f6); display:flex; gap:12px; align-items:flex-start;">
+                    <span style="flex:0 0 auto; width:26px; height:26px; border-radius:50%; background:${meta.color}1a; color:${meta.color}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">${meta.emoji}</span>
+                    <div style="flex:1; min-width:0;">
+                        <div style="display:flex; justify-content:space-between; gap:8px; align-items:baseline;">
+                            <span style="font-weight:600; color:${meta.color}; font-size:13px;">${meta.label}</span>
+                            <span style="font-size:11px; color:var(--pr-text-muted, #9ca3af); font-family:var(--pr-mono, ui-monospace, monospace); white-space:nowrap;">${fmtSecurityTime(e.t)}</span>
+                        </div>
+                        ${detail ? `<div style="font-size:12px; color:var(--pr-text-2, #4b5563); margin-top:2px;">${detail}</div>` : ''}
+                        ${ua ? `<div style="font-size:11px; color:var(--pr-text-muted, #9ca3af); margin-top:3px; font-family:var(--pr-mono, ui-monospace, monospace); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${ua}">${ua}</div>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+        function openSecurityLog() {
+            const ov = document.getElementById('securityLogOverlay');
+            const modal = document.getElementById('securityLogModal');
+            const body = document.getElementById('securityLogBody');
+            const summary = document.getElementById('securityLogSummary');
+            if (!ov || !modal || !body) return;
+            body.innerHTML = renderSecurityLogHtml();
+            // Summary strip
+            const counts = securityLog.reduce((a, e) => { a[e.type] = (a[e.type]||0) + 1; return a; }, {});
+            const rl = getRateLimitStatus();
+            const rlHtml = rl.blocked
+                ? `<span style="color:#b91c1c; font-weight:600;">· Locked out for ${Math.ceil(rl.remaining / 60)} min</span>`
+                : (rl.recentFails ? `<span style="color:#d97706;">· ${rl.recentFails} recent failure${rl.recentFails > 1 ? 's' : ''}</span>` : '');
+            summary.innerHTML = `<strong>${securityLog.length}</strong> event${securityLog.length !== 1 ? 's' : ''} · ` +
+                `<span style="color:#16a34a;">${counts.login_ok || 0} OK</span> · ` +
+                `<span style="color:#dc2626;">${counts.login_fail || 0} failed</span> · ` +
+                `<span style="color:#2563eb;">${counts.autologin_ok || 0} auto</span> ${rlHtml}`;
+            ov.classList.remove('hidden');
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex';
+        }
+        function closeSecurityLog() {
+            const ov = document.getElementById('securityLogOverlay');
+            const modal = document.getElementById('securityLogModal');
+            if (ov) ov.classList.add('hidden');
+            if (modal) { modal.classList.add('hidden'); modal.style.display = 'none'; }
+        }
+        function exportSecurityLog() {
+            try {
+                const blob = new Blob([JSON.stringify(securityLog, null, 2)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `flowdesk_security_log_${new Date().toISOString().slice(0,10)}.json`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+            } catch (e) { alert('Export failed: ' + e.message); }
+        }
+        function clearSecurityLog() {
+            if (!confirm('Clear the entire security log? This cannot be undone.')) return;
+            securityLog = [];
+            try { localStorage.removeItem('flowdesk_security_log'); } catch (e) {}
+            openSecurityLog();  // re-render
+        }
+
         async function doLogin() {
             const input = document.getElementById('loginKeyInput');
             const btn = document.getElementById('loginBtn');
             const errEl = document.getElementById('loginError');
             const key = input.value.trim();
             if (!key) { input.classList.add('error'); return; }
+
+            // Rate limit gate
+            const rl = getRateLimitStatus();
+            if (rl.blocked) {
+                input.classList.add('error');
+                errEl.textContent = `Too many failed attempts. Try again in ${Math.ceil(rl.remaining / 60)} min.`;
+                errEl.style.display = 'block';
+                return;
+            }
 
             btn.disabled = true; btn.textContent = 'Verifying...';
             errEl.style.display = 'none'; input.classList.remove('error');
@@ -3889,8 +4221,13 @@
                 const data = await resp.json();
                 if (data.error && data.code === 401) {
                     input.classList.add('error');
+                    errEl.textContent = '密碼錯誤，請重試。';
                     errEl.style.display = 'block';
                     btn.disabled = false; btn.textContent = 'Unlock';
+                    // Clear the input so the password doesn't linger in DOM (DevTools exposure)
+                    input.value = '';
+                    recordLoginFailure();
+                    logSecurityEvent('login_fail', 'Wrong password');
                     return;
                 }
                 // Success!
@@ -3898,6 +4235,10 @@
                 if (document.getElementById('loginRemember').checked) {
                     localStorage.setItem('flowdesk_api_key', key);
                 }
+                // Clear the plaintext from the input after successful auth
+                input.value = '';
+                clearRateLimitOnSuccess();
+                logSecurityEvent('login_ok', 'Password unlock');
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('mainApp').style.display = '';
                 document.getElementById('logoutArea').style.display = '';
@@ -3914,12 +4255,14 @@
                 errEl.textContent = 'Connection error. Check your network.';
                 errEl.style.display = 'block';
                 btn.disabled = false; btn.textContent = 'Unlock';
+                logSecurityEvent('login_error', 'Network / connection error');
             }
         }
 
         function doLogout() {
             FLOWDESK_API_KEY = '';
             localStorage.removeItem('flowdesk_api_key');
+            logSecurityEvent('logout', 'Manual logout');
             document.getElementById('mainApp').style.display = 'none';
             document.getElementById('logoutArea').style.display = 'none';
             document.getElementById('loginScreen').style.display = '';
@@ -3934,6 +4277,7 @@
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('mainApp').style.display = '';
                 document.getElementById('logoutArea').style.display = '';
+                logSecurityEvent('autologin_ok', 'Auto-login from saved key');
                 return true;
             }
             return false;
@@ -4255,6 +4599,38 @@
             // Insert shell at top of mainApp
             mainApp.insertBefore(shell, mainApp.firstChild);
 
+            // ── Command palette (⌘K / Jump to / typing in top search) ──
+            if (!document.getElementById('prismPaletteBackdrop')) {
+                const paletteBackdrop = document.createElement('div');
+                paletteBackdrop.className = 'prism-palette-backdrop';
+                paletteBackdrop.id = 'prismPaletteBackdrop';
+                paletteBackdrop.innerHTML = `
+                    <div class="prism-palette" id="prismPalette" role="dialog" aria-label="Jump to">
+                        <div class="prism-palette-input-wrap">
+                            <span class="prism-palette-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                            </span>
+                            <input type="text" class="prism-palette-input" id="prismPaletteInput" placeholder="Search tasks, notes, events, flows…" autocomplete="off" spellcheck="false">
+                            <span class="prism-palette-esc">ESC</span>
+                        </div>
+                        <div class="prism-palette-body" id="prismPaletteBody"></div>
+                        <div class="prism-palette-footer">
+                            <div class="prism-palette-footer-keys">
+                                <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+                                <span><kbd>↵</kbd> open</span>
+                                <span><kbd>esc</kbd> close</span>
+                            </div>
+                            <span id="prismPaletteCount"></span>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(paletteBackdrop);
+                // Clicking backdrop (outside the palette card) closes
+                paletteBackdrop.addEventListener('click', (e) => {
+                    if (e.target === paletteBackdrop) closePalette();
+                });
+            }
+
             // Wire nav buttons to switchView (also updates legacy .view-tab active)
             // The sidebar flow filter (selectedFlowId) persists across view switches —
             // user clears via the sidebar "All flows" row or the × on the filter chip.
@@ -4266,16 +4642,43 @@
                 });
             });
 
-            // Wire topbar actions to legacy handlers
+            // Wire topbar actions — topbar search opens the command palette
             const tsb = document.getElementById('prismSearchBox');
-            if (tsb) tsb.addEventListener('input', (e) => {
-                const legacy = document.getElementById('searchBox');
-                if (legacy) { legacy.value = e.target.value; legacy.dispatchEvent(new Event('input')); }
-            });
+            if (tsb) {
+                // Typing in topbar search opens palette with initial query
+                tsb.addEventListener('input', (e) => {
+                    const q = e.target.value;
+                    if (q && q.length > 0) {
+                        openPalette(q);
+                        e.target.value = ''; // palette takes over typing
+                    }
+                });
+                // Focus → open empty palette
+                tsb.addEventListener('focus', () => { openPalette(''); tsb.blur(); });
+            }
+            // Sidebar "Jump to…" stub opens palette
+            const stub = document.getElementById('prismSearchStub');
+            if (stub) stub.addEventListener('click', () => openPalette(''));
             document.getElementById('prismSyncBtn').addEventListener('click', () => syncData('quick'));
             document.getElementById('prismFullSyncBtn').addEventListener('click', () => syncData('full'));
             document.getElementById('prismNewTaskBtn').addEventListener('click', addNewTask);
             document.getElementById('prismMoreBtn').addEventListener('click', openPrismMore);
+
+            // Global keyboard: ⌘K / Ctrl+K opens palette; ESC closes
+            document.addEventListener('keydown', (e) => {
+                const k = (e.key || '').toLowerCase();
+                const inModifier = e.metaKey || e.ctrlKey;
+                if (inModifier && k === 'k') {
+                    e.preventDefault();
+                    openPalette('');
+                } else if (k === 'escape') {
+                    const bd = document.getElementById('prismPaletteBackdrop');
+                    if (bd && bd.classList.contains('open')) {
+                        e.preventDefault();
+                        closePalette();
+                    }
+                }
+            });
 
             // Topbar shadow on scroll (scroll container is pageWrap under the new flex layout)
             pageWrap.addEventListener('scroll', () => {
@@ -4621,6 +5024,288 @@
                     renderPrismSidebar();  // refresh active highlight
                 });
             });
+        }
+
+        // ── Command palette (search + Jump to unified) ──────────────────────
+        let _paletteItems = [];      // flat list of results (current query)
+        let _paletteActiveIdx = 0;   // keyboard nav index
+        const _paletteEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        function _paletteHighlight(text, q) {
+            const safe = _paletteEsc(text || '');
+            if (!q) return safe;
+            try {
+                const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const re = new RegExp('(' + escaped + ')', 'ig');
+                return safe.replace(re, '<mark>$1</mark>');
+            } catch (e) { return safe; }
+        }
+
+        function openPalette(initialQuery) {
+            const bd = document.getElementById('prismPaletteBackdrop');
+            const input = document.getElementById('prismPaletteInput');
+            if (!bd || !input) return;
+            bd.classList.add('open');
+            input.value = initialQuery || '';
+            _paletteActiveIdx = 0;
+            renderPaletteResults(input.value);
+            // Focus on next frame so animation doesn't eat the focus
+            requestAnimationFrame(() => input.focus());
+            // One-shot: attach input listener (idempotent — remove then add)
+            input.oninput = (e) => {
+                _paletteActiveIdx = 0;
+                renderPaletteResults(e.target.value);
+            };
+            input.onkeydown = (e) => {
+                const k = e.key;
+                if (k === 'ArrowDown') {
+                    e.preventDefault();
+                    _paletteActiveIdx = Math.min(_paletteItems.length - 1, _paletteActiveIdx + 1);
+                    updatePaletteActive();
+                } else if (k === 'ArrowUp') {
+                    e.preventDefault();
+                    _paletteActiveIdx = Math.max(0, _paletteActiveIdx - 1);
+                    updatePaletteActive();
+                } else if (k === 'Enter') {
+                    e.preventDefault();
+                    const item = _paletteItems[_paletteActiveIdx];
+                    if (item) activatePaletteItem(item);
+                }
+                // ESC handled by global keydown
+            };
+        }
+
+        function closePalette() {
+            const bd = document.getElementById('prismPaletteBackdrop');
+            if (bd) bd.classList.remove('open');
+        }
+
+        function runPaletteSearch(qRaw) {
+            const q = (qRaw || '').trim().toLowerCase();
+            const tasks = [], notes = [], events = [], flows = [];
+            const groups = (appData && appData.groups) ? appData.groups : [];
+            const addTask = (t, g) => {
+                const hay = [t.name, t.notes, (t.labels||[]).join(' ')].filter(Boolean).join(' ').toLowerCase();
+                if (!q || hay.includes(q)) {
+                    tasks.push({
+                        kind: 'task', id: t.id, name: t.name || 'Untitled',
+                        groupTitle: g.title, groupColor: g.color, groupId: g.id,
+                        status: t.status, dueDate: t.dueDate,
+                    });
+                }
+            };
+            groups.forEach(g => {
+                const gName = (g.title || '').toLowerCase();
+                if (!q || gName.includes(q)) {
+                    flows.push({ kind: 'flow', id: g.id, name: g.title, color: g.color, taskCount: (g.tasks||[]).length });
+                }
+                (g.tasks || []).forEach(t => addTask(t, g));
+            });
+            const notesArr = (typeof notesData !== 'undefined' && notesData && notesData.notes) ? notesData.notes : [];
+            notesArr.forEach(n => {
+                const hay = [n.title, n.content, (n.tags||[]).join(' ')].filter(Boolean).join(' ').toLowerCase();
+                if (!q || hay.includes(q)) {
+                    notes.push({ kind: 'note', id: n.id, name: n.title || 'Untitled note', folder: n.folder || '' });
+                }
+            });
+            const eventsArr = (typeof calendarData !== 'undefined' && calendarData && calendarData.events) ? calendarData.events : [];
+            eventsArr.forEach(ev => {
+                const hay = [ev.title, ev.description].filter(Boolean).join(' ').toLowerCase();
+                if (!q || hay.includes(q)) {
+                    events.push({
+                        kind: 'event', id: ev.id, name: ev.title || '(no title)',
+                        dateStr: ev.event_date || ev.date || '',
+                        timeStr: (ev.start_time && ev.end_time) ? `${ev.start_time}–${ev.end_time}` : (ev.all_day ? 'All day' : ''),
+                    });
+                }
+            });
+            // Cap per section (first 12 each — palette shouldn't feel like a dump)
+            return {
+                tasks:  tasks.slice(0, 12),
+                notes:  notes.slice(0, 12),
+                events: events.slice(0, 12),
+                flows:  flows.slice(0, 8),
+                totalUncapped: tasks.length + notes.length + events.length + flows.length,
+            };
+        }
+
+        function renderPaletteResults(qRaw) {
+            const body = document.getElementById('prismPaletteBody');
+            const countEl = document.getElementById('prismPaletteCount');
+            if (!body) return;
+            const q = qRaw || '';
+            // Empty query → show hint + flow jumps (short, not all tasks). Typing any char = full search.
+            if (!q.trim()) {
+                _paletteItems = [];
+                const groups = (appData && appData.groups) ? appData.groups : [];
+                let h = `<div class="prism-palette-empty">Start typing to search tasks, notes, events, or flows<span class="prism-palette-empty-hint">Or jump to a flow below</span></div>`;
+                if (groups.length) {
+                    h += `<div class="prism-palette-section"><div class="prism-palette-section-label">Jump to flow</div>`;
+                    groups.slice(0, 8).forEach(g => {
+                        const item = { kind: 'flow', id: g.id, name: g.title, color: g.color, taskCount: (g.tasks||[]).length };
+                        _paletteItems.push(item);
+                        const dot = g.color ? `<span class="prism-palette-item-dot" style="background:${g.color}"></span>` : '';
+                        h += `<div class="prism-palette-item" data-kind="flow" data-id="${_paletteEsc(g.id)}">
+                            ${dot}
+                            <div class="prism-palette-item-kind" title="Flow">◈</div>
+                            <div class="prism-palette-item-body">
+                                <div class="prism-palette-item-title">${_paletteEsc(g.title)}</div>
+                                <div class="prism-palette-item-sub">${(g.tasks||[]).length} task${(g.tasks||[]).length===1?'':'s'}</div>
+                            </div>
+                            <span class="prism-palette-item-shortcut">↵ filter</span>
+                        </div>`;
+                    });
+                    h += `</div>`;
+                }
+                body.innerHTML = h;
+                body.querySelectorAll('.prism-palette-item').forEach((el, idx) => {
+                    el.addEventListener('click', () => activatePaletteItem(_paletteItems[idx]));
+                    el.addEventListener('mouseenter', () => { _paletteActiveIdx = idx; updatePaletteActive(); });
+                });
+                _paletteActiveIdx = 0;
+                updatePaletteActive();
+                if (countEl) countEl.textContent = '';
+                return;
+            }
+            const res = runPaletteSearch(q);
+            _paletteItems = [];
+            let html = '';
+            const pushSection = (label, arr, renderer) => {
+                if (!arr.length) return;
+                html += `<div class="prism-palette-section"><div class="prism-palette-section-label">${label} (${arr.length})</div>`;
+                arr.forEach(item => {
+                    _paletteItems.push(item);
+                    html += renderer(item);
+                });
+                html += `</div>`;
+            };
+            // Tasks
+            pushSection('Tasks', res.tasks, (t) => {
+                const dot = t.groupColor ? `<span class="prism-palette-item-dot" style="background:${t.groupColor}"></span>` : '';
+                const sub = [t.groupTitle, t.status, t.dueDate ? `due ${t.dueDate}` : null].filter(Boolean).join(' · ');
+                return `<div class="prism-palette-item" data-kind="task" data-id="${_paletteEsc(t.id)}" data-gid="${_paletteEsc(t.groupId)}">
+                    ${dot}
+                    <div class="prism-palette-item-kind" title="Task">◆</div>
+                    <div class="prism-palette-item-body">
+                        <div class="prism-palette-item-title">${_paletteHighlight(t.name, q)}</div>
+                        <div class="prism-palette-item-sub">${_paletteEsc(sub)}</div>
+                    </div>
+                    <span class="prism-palette-item-shortcut">↵ open</span>
+                </div>`;
+            });
+            // Notes
+            pushSection('Notes', res.notes, (n) => {
+                return `<div class="prism-palette-item" data-kind="note" data-id="${_paletteEsc(n.id)}">
+                    <div class="prism-palette-item-kind" title="Note">≡</div>
+                    <div class="prism-palette-item-body">
+                        <div class="prism-palette-item-title">${_paletteHighlight(n.name, q)}</div>
+                        <div class="prism-palette-item-sub">${_paletteEsc(n.folder || 'Notes')}</div>
+                    </div>
+                    <span class="prism-palette-item-shortcut">↵ open</span>
+                </div>`;
+            });
+            // Events
+            pushSection('Events', res.events, (ev) => {
+                const sub = [ev.dateStr, ev.timeStr].filter(Boolean).join(' · ');
+                return `<div class="prism-palette-item" data-kind="event" data-id="${_paletteEsc(ev.id)}" data-date="${_paletteEsc(ev.dateStr)}">
+                    <div class="prism-palette-item-kind" title="Event">◷</div>
+                    <div class="prism-palette-item-body">
+                        <div class="prism-palette-item-title">${_paletteHighlight(ev.name, q)}</div>
+                        <div class="prism-palette-item-sub">${_paletteEsc(sub)}</div>
+                    </div>
+                    <span class="prism-palette-item-shortcut">↵ open</span>
+                </div>`;
+            });
+            // Flows
+            pushSection('Flows', res.flows, (f) => {
+                const dot = f.color ? `<span class="prism-palette-item-dot" style="background:${f.color}"></span>` : '';
+                return `<div class="prism-palette-item" data-kind="flow" data-id="${_paletteEsc(f.id)}">
+                    ${dot}
+                    <div class="prism-palette-item-kind" title="Flow">◈</div>
+                    <div class="prism-palette-item-body">
+                        <div class="prism-palette-item-title">${_paletteHighlight(f.name, q)}</div>
+                        <div class="prism-palette-item-sub">${f.taskCount} task${f.taskCount===1?'':'s'}</div>
+                    </div>
+                    <span class="prism-palette-item-shortcut">↵ filter</span>
+                </div>`;
+            });
+
+            if (!html) {
+                html = q
+                    ? `<div class="prism-palette-empty">No matches for "${_paletteEsc(q)}"<span class="prism-palette-empty-hint">Search covers tasks, notes, events, and flows.</span></div>`
+                    : `<div class="prism-palette-empty">Start typing to search<span class="prism-palette-empty-hint">Find tasks, notes, events, and flows across the app.</span></div>`;
+            }
+            body.innerHTML = html;
+            // Wire per-item click
+            body.querySelectorAll('.prism-palette-item').forEach((el, idx) => {
+                el.addEventListener('click', () => activatePaletteItem(_paletteItems[idx]));
+                el.addEventListener('mouseenter', () => { _paletteActiveIdx = idx; updatePaletteActive(); });
+            });
+            updatePaletteActive();
+            if (countEl) countEl.textContent = _paletteItems.length ? `${_paletteItems.length} result${_paletteItems.length === 1 ? '' : 's'}` : '';
+        }
+
+        function updatePaletteActive() {
+            const body = document.getElementById('prismPaletteBody');
+            if (!body) return;
+            const items = body.querySelectorAll('.prism-palette-item');
+            items.forEach((el, i) => el.classList.toggle('active', i === _paletteActiveIdx));
+            // Scroll active into view
+            const active = items[_paletteActiveIdx];
+            if (active && typeof active.scrollIntoView === 'function') {
+                active.scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        function activatePaletteItem(item) {
+            if (!item) return;
+            closePalette();
+            if (item.kind === 'task') {
+                // Navigate to Tasks view, focus the matching row
+                selectedFlowId = item.groupId || null;
+                switchView('table');
+                syncPrismNavActive('table');
+                if (typeof renderPrismSidebar === 'function') renderPrismSidebar();
+                // After render, scroll to + briefly highlight the row
+                requestAnimationFrame(() => {
+                    const rows = document.querySelectorAll('#tableView .group-table tbody tr');
+                    for (const row of rows) {
+                        if (row.dataset && row.dataset.taskId === item.id) {
+                            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            row.classList.add('palette-flash');
+                            setTimeout(() => row.classList.remove('palette-flash'), 1400);
+                            break;
+                        }
+                    }
+                });
+            } else if (item.kind === 'note') {
+                switchView('notes');
+                syncPrismNavActive('notes');
+                if (typeof selectNote === 'function') {
+                    try { selectNote(item.id); } catch (e) {}
+                } else {
+                    currentNoteId = item.id;
+                    if (typeof renderNotes === 'function') renderNotes();
+                }
+            } else if (item.kind === 'event') {
+                switchView('calendar');
+                syncPrismNavActive('calendar');
+                if (item.dateStr) {
+                    try {
+                        const d = new Date(item.dateStr);
+                        if (!isNaN(d.getTime())) {
+                            if (typeof currentCalendarDate !== 'undefined') {
+                                currentCalendarDate = d;
+                            }
+                            if (typeof renderCalendar === 'function') renderCalendar();
+                        }
+                    } catch (e) {}
+                }
+            } else if (item.kind === 'flow') {
+                selectedFlowId = item.id;
+                switchView('table');
+                syncPrismNavActive('table');
+                if (typeof renderPrismSidebar === 'function') renderPrismSidebar();
+            }
         }
 
         function openPrismMore() {
@@ -5440,6 +6125,8 @@
 
         function createTableTaskRow(task, group) {
             const tr = document.createElement('tr');
+            // Tag the row so the command palette can find + scroll to it
+            tr.dataset.taskId = task.id;
             if (isOverdue(task.dueDate, task.status)) tr.classList.add('overdue');
             tr.draggable = true;
             tr.addEventListener('dragstart', (e) => {

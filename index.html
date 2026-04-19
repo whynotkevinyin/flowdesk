@@ -5084,16 +5084,20 @@
                 </div>`;
             }).join('');
             list.innerHTML = html;
-            // Click a flow row → set filter, stay on current view, re-render so it honors the filter
-            list.querySelectorAll('.prism-flow-row').forEach(row => {
-                row.addEventListener('click', () => {
+            // Click a flow row → set filter, stay on current view, re-render so it honors the filter.
+            // Use event delegation so the listener survives any DOM re-render and also catches
+            // rows that some other render path might have inserted.
+            if (!list._flowClickBound) {
+                list.addEventListener('click', (e) => {
+                    const row = e.target.closest('.prism-flow-row');
+                    if (!row || !list.contains(row)) return;
                     const gid = row.dataset.gid || null;
                     selectedFlowId = gid;
-                    // Stay on current view — renderApp() will re-route to the correct renderer
                     if (typeof renderApp === 'function') renderApp();
                     renderPrismSidebar();  // refresh active highlight
                 });
-            });
+                list._flowClickBound = true;
+            }
         }
 
         // ── Command palette (search + Jump to unified) ──────────────────────
